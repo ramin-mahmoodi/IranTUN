@@ -53,9 +53,26 @@ main() {
         SECURE_UUID="cc654e3d-71b5-4a6c-b3a2-a3962b8a07c1"
     fi
 
-    echo -e "\n${YELLOW}--- Part 1: Foreign VPS Exit Node Configuration ---${NC}"
-    VPS_IP=$(prompt_input "Enter Foreign VPS IP Address")
-    VPS_PORT=$(prompt_input "Enter Foreign VPS SSH Port" "22")
+    echo -e "\n${YELLOW}--- Part 1: Foreign VPS Execution Context ---${NC}"
+    IS_LOCAL_VPS=$(prompt_input "Are you running this script directly ON the Foreign VPS? (y/n)" "y")
+    
+    VPS_IP=""
+    if [ "$IS_LOCAL_VPS" = "y" ] || [ "$IS_LOCAL_VPS" = "Y" ]; then
+        echo -e "${BLUE}Detecting public IP of this VPS...${NC}"
+        VPS_IP=$(curl -s https://api.ipify.org)
+        if [ -z "$VPS_IP" ]; then
+            VPS_IP=$(curl -s http://ifconfig.me)
+        fi
+        
+        if [ -n "$VPS_IP" ]; then
+            echo -e "${GREEN}✓ Detected VPS IP: $VPS_IP${NC}"
+        else
+            VPS_IP=$(prompt_input "Failed to auto-detect IP. Enter Foreign VPS IP Address")
+        fi
+    else
+        VPS_IP=$(prompt_input "Enter Foreign VPS IP Address")
+        VPS_PORT=$(prompt_input "Enter Foreign VPS SSH Port" "22")
+    fi
     
     echo -e "\n${YELLOW}--- Part 2: cPanel Bridge Configurations ---${NC}"
     BRIDGE_DOMAIN=$(prompt_input "Enter your cPanel Domain (e.g. yourdomain.com)")
@@ -82,16 +99,21 @@ main() {
 
     # 1. Connect to VPS and install Xray
     echo -e "\n${BLUE}--- Part 3: Deploying Exit Node on Foreign VPS ---${NC}"
-    echo -e "${YELLOW}Connecting to root@$VPS_IP:$VPS_PORT via SSH to install Xray...${NC}"
-    echo -e "${GREEN}Notice: You may be asked for your VPS root SSH password below.${NC}"
-
-    ssh -p "$VPS_PORT" -o StrictHostKeyChecking=no root@"$VPS_IP" "bash -s" <<EOF
+    
+    if [ "$IS_LOCAL_VPS" = "y" ] || [ "$IS_LOCAL_VPS" = "Y" ]; then
+        echo -e "${YELLOW}Running VPS installation steps locally...${NC}"
+        
+        if [ "$EUID" -ne 0 ]; then
+            echo -e "${RED}Error: Please run this script as root (sudo bash deploy.sh) to configure VPS locally!${NC}"
+            exit 1
+        fi
+        
         echo "Installing Xray-core..."
-        bash -c "\$(curl -L https://github.com/XTLS/Xray-install/raw/main/install-release.sh)" @ install
+        bash -c "$(curl -L https://github.com/XTLS/Xray-install/raw/main/install-release.sh)" @ install
         
         echo "Configuring VLESS inbound on port 8080..."
         mkdir -p /usr/local/etc/xray
-        cat << 'XRAY_CONF' > /usr/local/etc/xray/config.json
+        cat <<XRAY_CONF > /usr/local/etc/xray/config.json
 {
   "log": { "loglevel": "warning" },
   "inbounds": [
@@ -133,15 +155,71 @@ XRAY_CONF
         
         sleep 1
         if systemctl is-active --quiet xray; then
-            echo "✓ Xray Exit Node is active and running beautifully!"
+            echo -e "${GREEN}✓ Xray Exit Node is active locally and running beautifully!${NC}"
         else
-            echo "⚠ Warning: Xray service failed to start or state is unknown."
+            echo -e "${RED}⚠ Warning: Xray service failed to start or state is unknown.${NC}"
         fi
-EOF
+    else
+        echo -e "${YELLOW}Connecting to root@$VPS_IP:$VPS_PORT via SSH to install Xray...${NC}"
+        echo -e "${GREEN}Notice: You may be asked for your VPS root SSH password below.${NC}"
 
-    if [ $? -ne 0 ]; then
-        echo -e "${RED}✗ VPS SSH Deployment failed! Please double check your credentials.${NC}"
-        exit 1
+        ssh -p "$VPS_PORT" -o StrictHostKeyChecking=no root@"$VPS_IP" "bash -s" <<EOF
+            echo "Installing Xray-core..."
+            bash -c "\$(curl -L https://github.com/XTLS/Xray-install/raw/main/install-release.sh)" @ install
+            
+            echo "Configuring VLESS inbound on port 8080..."
+            mkdir -p /usr/local/etc/xray
+            cat << 'XRAY_CONF' > /usr/local/etc/xray/config.json
+{
+  "log": { "loglevel": "warning" },
+  "inbounds": [
+    {
+      "port": 8080,
+      "protocol": "vless",
+      "settings": {
+        "clients": [
+          {
+            "id": "$SECURE_UUID",
+            "level": 0,
+            "email": "love@$BRIDGE_DOMAIN"
+          }
+        ],
+        "decryption": "none"
+      },
+      "streamSettings": {
+        "network": "ws",
+        "wsSettings": { "path": "/metrics" }
+      }
+    }
+  ],
+  "outbounds": [
+    { "protocol": "freedom", "settings": {}, "tag": "direct" },
+    { "protocol": "blackhole", "settings": {}, "tag": "blocked" }
+  ],
+  "routing": {
+    "rules": [
+      { "type": "field", "ip": ["geoip:private"], "outboundTag": "blocked" }
+    ]
+  }
+}
+XRAY_CONF
+
+            echo "Restarting Xray daemon..."
+            systemctl daemon-reload
+            systemctl restart xray
+            systemctl enable xray
+            
+            sleep 1
+            if systemctl is-active --quiet xray; then
+                echo "✓ Xray Exit Node is active and running beautifully!"
+            else
+                echo "⚠ Warning: Xray service failed to start or state is unknown."
+            fi
+EOF
+        if [ $? -ne 0 ]; then
+            echo -e "${RED}✗ VPS SSH Deployment failed! Please double check your credentials.${NC}"
+            exit 1
+        fi
     fi
 
     # 2. Write local config.json locally for deployment
