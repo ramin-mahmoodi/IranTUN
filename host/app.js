@@ -124,7 +124,10 @@ const server = http.createServer((req, res) => {
 });
 
 // Setup WebSocket Server bound to the same HTTP Server
-const wss = new WebSocket.Server({ noServer: true });
+const wss = new WebSocket.Server({ 
+  noServer: true,
+  perMessageDeflate: false
+});
 
 server.on('upgrade', (request, socket, head) => {
   const pathname = request.url.split('?')[0];
@@ -147,7 +150,9 @@ wss.on('connection', (localWs, req) => {
 
   // Construct target VPS URL
   const targetUrl = `ws://${config.vpsIp}:${config.vpsPort}${config.vpsPath}`;
-  const remoteWs = new WebSocket(targetUrl);
+  const remoteWs = new WebSocket(targetUrl, {
+    perMessageDeflate: false
+  });
   
   const bufferQueue = [];
   let isRemoteOpen = false;
