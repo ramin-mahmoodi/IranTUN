@@ -14,7 +14,19 @@ An ultra-high-speed, serverless, and CPU-efficient WebSocket VLESS proxy tunnel 
 
 ## 🛠️ Interactive One-Click Installation
 
-First, clone the repository and install the required Python dependencies:
+You can deploy the entire setup using either the **Bash script** (recommended for Linux/macOS/Git-Bash) or the **Python script** (recommended for Windows).
+
+### Option A: Via Bash Script (No dependencies required)
+Simply run:
+
+```bash
+git clone https://github.com/ramin-mahmoodi/IranTUN.git
+cd IranTUN
+bash deploy.sh
+```
+
+### Option B: Via Python Script
+First, install the required Python dependencies:
 
 ```bash
 git clone https://github.com/ramin-mahmoodi/IranTUN.git
@@ -22,7 +34,7 @@ cd IranTUN
 pip install -r requirements.txt
 ```
 
-Then, run the interactive Python deployer on your local computer:
+Then, run the interactive Python deployer:
 
 ```bash
 python deploy.py
@@ -30,7 +42,7 @@ python deploy.py
 
 This script will:
 1. SSH into your Foreign VPS and set up Xray VLESS-WS on port 8080 automatically.
-2. Ask if you want to deploy to cPanel via **Fully Automated SSH** (Methods A: registers Node.js app automatically on CloudLinux selector!) or **Semi-Automated FTP** (Method B: uploads files and gives direct cPanel GUI setup steps).
+2. Ask if you want to deploy to cPanel via **Fully Automated SSH** (Method 1: registers Node.js app automatically on CloudLinux selector!) or **Semi-Automated FTP** (Method 2: uploads files and gives direct cPanel GUI setup steps).
 3. Generate a brand new secure random VLESS UUID dynamically.
 4. Upload all the bridge application and camouflage files to your targeted host path.
 5. Print ready-to-import client VLESS links in your terminal.
