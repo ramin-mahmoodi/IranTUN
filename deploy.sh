@@ -164,12 +164,9 @@ EOF
         echo -e "${YELLOW}Connecting to $CP_SSH_USER@$CP_SSH_HOST:$CP_SSH_PORT...${NC}"
         echo -e "${GREEN}Notice: You may be asked for your cPanel SSH password below.${NC}"
 
-        # Create remote folders
-        ssh -p "$CP_SSH_PORT" -o StrictHostKeyChecking=no "$CP_SSH_USER@$CP_SSH_HOST" "mkdir -p ~/$APP_ROOT ~/$APP_ROOT/public"
-        
-        # Upload using scp
-        scp -P "$CP_SSH_PORT" host/app.js host/package.json host/config.json "$CP_SSH_USER@$CP_SSH_HOST:~/$APP_ROOT/"
-        scp -P "$CP_SSH_PORT" host/public/index.html host/public/style.css "$CP_SSH_USER@$CP_SSH_HOST:~/$APP_ROOT/public/"
+        # Compress, stream, and extract files remotely in a single connection
+        echo "Archiving and uploading bridge files in a single SSH stream..."
+        tar -C host -czf - . | ssh -p "$CP_SSH_PORT" -o StrictHostKeyChecking=no "$CP_SSH_USER@$CP_SSH_HOST" "mkdir -p ~/$APP_ROOT && tar -xzf - -C ~/$APP_ROOT"
 
         # Register Node application
         ssh -p "$CP_SSH_PORT" -o StrictHostKeyChecking=no "$CP_SSH_USER@$CP_SSH_HOST" "bash -s" <<EOF
@@ -199,12 +196,13 @@ EOF
         echo -e "\n${BLUE}--- Part 4: Connecting to cPanel via FTP ---${NC}"
         echo -e "${YELLOW}Uploading files to ftp://$FTP_HOST/$APP_ROOT...${NC}"
 
-        # Upload files using curl (FTP)
-        curl -u "$FTP_USER:$FTP_PASS" --ftp-create-dirs -T host/app.js "ftp://$FTP_HOST/$APP_ROOT/app.js"
-        curl -u "$FTP_USER:$FTP_PASS" --ftp-create-dirs -T host/package.json "ftp://$FTP_HOST/$APP_ROOT/package.json"
-        curl -u "$FTP_USER:$FTP_PASS" --ftp-create-dirs -T host/config.json "ftp://$FTP_HOST/$APP_ROOT/config.json"
-        curl -u "$FTP_USER:$FTP_PASS" --ftp-create-dirs -T host/public/index.html "ftp://$FTP_HOST/$APP_ROOT/public/index.html"
-        curl -u "$FTP_USER:$FTP_PASS" --ftp-create-dirs -T host/public/style.css "ftp://$FTP_HOST/$APP_ROOT/public/style.css"
+        # Upload all files in a single curl execution to avoid multiple connection overheads
+        curl -u "$FTP_USER:$FTP_PASS" --ftp-create-dirs \
+            -T host/app.js "ftp://$FTP_HOST/$APP_ROOT/app.js" \
+            -T host/package.json "ftp://$FTP_HOST/$APP_ROOT/package.json" \
+            -T host/config.json "ftp://$FTP_HOST/$APP_ROOT/config.json" \
+            -T host/public/index.html "ftp://$FTP_HOST/$APP_ROOT/public/index.html" \
+            -T host/public/style.css "ftp://$FTP_HOST/$APP_ROOT/public/style.css"
 
         if [ $? -eq 0 ]; then
             echo -e "${GREEN}✓ All files uploaded successfully via FTP!${NC}"
