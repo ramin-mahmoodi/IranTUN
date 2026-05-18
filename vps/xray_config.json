@@ -9,9 +9,9 @@
       "settings": {
         "clients": [
           {
-            "id": "cc654e3d-71b5-4a6c-b3a2-a3962b8a07c1",
+            "id": "YOUR_UUID_HERE",
             "level": 0,
-            "email": "love@duud.lol"
+            "email": "love@yourdomain.com"
           }
         ],
         "decryption": "none"

@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Duud Tunnel - One-Click Foreign VPS Setup Script
+# IranTUN - One-Click Foreign VPS Setup Script
 # Colors for logging
 RED='\033[0;31m'
 GREEN='\033[0;32m'
@@ -8,13 +8,33 @@ BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
 echo -e "${BLUE}===============================================${NC}"
-echo -e "${BLUE}    Duud Tunnel - One-Click VPS Installer      ${NC}"
+echo -e "${BLUE}    IranTUN - One-Click VPS Installer          ${NC}"
 echo -e "${BLUE}===============================================${NC}"
 
 if [ "$EUID" -ne 0 ]; then
   echo -e "${RED}Error: Please run this script as root (sudo bash install_vps.sh)${NC}"
   exit 1
 fi
+
+# Generate or ask for configuration parameters
+read -p "Enter secure UUID (press Enter to auto-generate): " USER_UUID
+if [ -z "$USER_UUID" ]; then
+  if command -v uuidgen &> /dev/null; then
+    USER_UUID=$(uuidgen)
+  elif [ -f /proc/sys/kernel/random/uuid ]; then
+    USER_UUID=$(cat /proc/sys/kernel/random/uuid)
+  else
+    USER_UUID="cc654e3d-71b5-4a6c-b3a2-a3962b8a07c1" # Fallback
+  fi
+fi
+
+read -p "Enter cPanel Bridge Domain (e.g. yourdomain.com): " BRIDGE_DOMAIN
+if [ -z "$BRIDGE_DOMAIN" ]; then
+  BRIDGE_DOMAIN="yourdomain.com"
+fi
+
+echo -e "${BLUE}Using UUID: ${GREEN}$USER_UUID${NC}"
+echo -e "${BLUE}Using Domain: ${GREEN}$BRIDGE_DOMAIN${NC}"
 
 echo -e "${BLUE}[1/4] Installing Xray-core officially...${NC}"
 bash -c "$(curl -L https://github.com/XTLS/Xray-install/raw/main/install-release.sh)" @ install
@@ -30,7 +50,7 @@ echo -e "${BLUE}[2/4] Injecting secure VLESS-WS configurations...${NC}"
 CONFIG_DIR="/usr/local/etc/xray"
 mkdir -p "$CONFIG_DIR"
 
-cat << 'EOF' > "$CONFIG_DIR/config.json"
+cat << EOF > "$CONFIG_DIR/config.json"
 {
   "log": {
     "loglevel": "warning"
@@ -42,9 +62,9 @@ cat << 'EOF' > "$CONFIG_DIR/config.json"
       "settings": {
         "clients": [
           {
-            "id": "cc654e3d-71b5-4a6c-b3a2-a3962b8a07c1",
+            "id": "$USER_UUID",
             "level": 0,
-            "email": "love@duud.lol"
+            "email": "love@$BRIDGE_DOMAIN"
           }
         ],
         "decryption": "none"
@@ -100,17 +120,17 @@ fi
 
 echo -e "${BLUE}[4/4] Generating ready-to-use Client Configurations...${NC}"
 echo -e "${BLUE}=========================================================================${NC}"
-echo -e "${GREEN}Duud Tunnel VPS is fully active!${NC}"
+echo -e "${GREEN}IranTUN VPS is fully active!${NC}"
 echo -e ""
-echo -e "You can now upload the 'host' folder to your Iran Node.js Host (duud.lol)."
+echo -e "You can now deploy the 'host' folder to your Iran Node.js Host."
 echo -e "Once the host is active, add this VLESS connection in V2rayNG, Nekobox, or Shadowrocket:"
 echo -e ""
 echo -e "${BLUE}-------------------------------------------------------------------------${NC}"
 echo -e "${GREEN}VLESS URI (Import directly into Nekobox / V2rayNG):${NC}"
-echo -e "vless://cc654e3d-71b5-4a6c-b3a2-a3962b8a07c1@duud.lol:443?type=ws&security=tls&path=%2Fapi%2Fv1%2Fanalytics&host=duud.lol#Duud_Labs_HighSpeed_VLESS"
+echo -e "vless://$USER_UUID@$BRIDGE_DOMAIN:443?type=ws&security=tls&path=%2Fapi%2Fv1%2Fanalytics&host=$BRIDGE_DOMAIN#IranTUN_HighSpeed_VLESS"
 echo -e "${BLUE}-------------------------------------------------------------------------${NC}"
 echo -e ""
 echo -e "Or if you haven't activated SSL on your host yet, use the HTTP non-TLS version (port 80):"
-echo -e "vless://cc654e3d-71b5-4a6c-b3a2-a3962b8a07c1@duud.lol:80?type=ws&security=none&path=%2Fapi%2Fv1%2Fanalytics&host=duud.lol#Duud_Labs_Unsecured_VLESS"
+echo -e "vless://$USER_UUID@$BRIDGE_DOMAIN:80?type=ws&security=none&path=%2Fapi%2Fv1%2Fanalytics&host=$BRIDGE_DOMAIN#IranTUN_Unsecured_VLESS"
 echo -e ""
 echo -e "${BLUE}=========================================================================${NC}"
