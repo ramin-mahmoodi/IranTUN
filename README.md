@@ -14,7 +14,15 @@ An ultra-high-speed, serverless, and CPU-efficient WebSocket VLESS proxy tunnel 
 
 ## 🛠️ Interactive One-Click Installation
 
-To deploy the entire system (both the Foreign VPS and your Iran cPanel Host) in under 1 minute, simply run the interactive Python deployer on your local computer:
+First, clone the repository and install the required Python dependencies:
+
+```bash
+git clone https://github.com/ramin-mahmoodi/IranTUN.git
+cd IranTUN
+pip install -r requirements.txt
+```
+
+Then, run the interactive Python deployer on your local computer:
 
 ```bash
 python deploy.py
