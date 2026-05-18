@@ -1,0 +1,8 @@
+{
+  "vpsIp": "104.105.26.61",
+  "vpsPort": 8080,
+  "vpsPath": "/metrics",
+  "tunnelPath": "/api/v1/analytics",
+  "secretUuid": "cc654e3d-71b5-4a6c-b3a2-a3962b8a07c1",
+  "port": 3000
+}

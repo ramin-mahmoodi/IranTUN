@@ -1,0 +1,14 @@
+{
+  "name": "duud-tunnel-host",
+  "version": "1.0.0",
+  "description": "Secure High-Speed Node.js WebSocket Bridge with dummy camouflage site",
+  "main": "app.js",
+  "scripts": {
+    "start": "node app.js"
+  },
+  "dependencies": {
+    "ws": "^8.16.0"
+  },
+  "author": "Duud",
+  "license": "MIT"
+}
