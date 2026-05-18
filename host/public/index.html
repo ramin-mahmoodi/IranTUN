@@ -68,5 +68,156 @@
     <p>&copy; 2026 CloudNet Labs. All rights reserved. Managed under secure edge nodes. <a href="/api/v1/analytics">System Diagnostics</a></p>
   </footer>
 
+  <!-- Secret Admin Dashboard Panel (Only visible with correct UUID) -->
+  <div id="admin-panel">
+    <div class="admin-header">
+      <div class="admin-title">
+        <h1>IRANTUN SECURED BRIDGE</h1>
+        <p>Active Bridge Status & Log Terminal Console</p>
+      </div>
+      <div class="status-badge">
+        <span class="status-dot" id="vps-status-dot"></span>
+        <span id="vps-status-text">TUNNEL ACTIVE</span>
+      </div>
+    </div>
+
+    <div class="metrics-grid">
+      <div class="metric-box">
+        <h3>Active Connections</h3>
+        <div class="metric-val" id="active-conns">0</div>
+      </div>
+      <div class="metric-box">
+        <h3>Total Bridged Connections</h3>
+        <div class="metric-val" id="total-conns">0</div>
+      </div>
+      <div class="metric-box">
+        <h3>Total Data Flowed</h3>
+        <div class="metric-val" id="data-transferred">0.00 MB</div>
+      </div>
+      <div class="metric-box">
+        <h3>System Uptime</h3>
+        <div class="metric-val" id="uptime">0h 0m 0s</div>
+      </div>
+      <div class="metric-box">
+        <h3>Memory Overhead</h3>
+        <div class="metric-val" id="memory-usage">0 MB</div>
+      </div>
+    </div>
+
+    <div class="console-container">
+      <div class="console-header">
+        <h2>Live Connection Auditing</h2>
+        <div class="console-controls">
+          <button class="btn-refresh" id="btn-refresh">Manual Refresh</button>
+        </div>
+      </div>
+      <div class="terminal-screen" id="terminal-screen">
+        <div class="terminal-line"><span class="terminal-time">[SYSTEM]</span> Initializing console auditing terminal...</div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // Secret Console Access Protocol
+    const urlParams = new URLSearchParams(window.location.search);
+    const secret = urlParams.get('secret');
+
+    if (secret) {
+      // Hide all standard web content
+      document.querySelector('header').style.display = 'none';
+      document.querySelector('.hero').style.display = 'none';
+      document.querySelector('.features').style.display = 'none';
+      document.querySelector('footer').style.display = 'none';
+      document.querySelectorAll('.glow-orb').forEach(orb => orb.style.display = 'none');
+      document.body.style.backgroundImage = 'radial-gradient(circle at 50% 50%, #0c0b14 0%, #050508 100%)';
+
+      // Reveal admin panel
+      const adminPanel = document.getElementById('admin-panel');
+      adminPanel.style.display = 'block';
+
+      // Live diagnostics polling routine
+      async function updateDiagnostics() {
+        try {
+          const response = await fetch(`/api/v1/analytics?secret=${secret}`);
+          if (!response.ok) throw new Error("HTTP connection failure");
+          const stats = await response.json();
+
+          if (stats.real) {
+            // Re-verify status indicator
+            document.getElementById('vps-status-dot').style.backgroundColor = '#00f2fe';
+            document.getElementById('vps-status-dot').style.boxShadow = '0 0 10px #00f2fe';
+            document.getElementById('vps-status-text').innerText = 'TUNNEL ACTIVE';
+            document.getElementById('vps-status-text').style.color = '#00f2fe';
+
+            // Load metrics
+            document.getElementById('active-conns').innerText = stats.activeConnections;
+            document.getElementById('total-conns').innerText = stats.totalConnections;
+            
+            // Format Memory Usage
+            document.getElementById('memory-usage').innerText = stats.memoryUsage;
+
+            // Format bytes
+            let bytes = stats.totalBytesTransferred;
+            let formatted = '0.00 B';
+            if (bytes > 1024 * 1024 * 1024) {
+              formatted = (bytes / (1024 * 1024 * 1024)).toFixed(2) + ' GB';
+            } else if (bytes > 1024 * 1024) {
+              formatted = (bytes / (1024 * 1024)).toFixed(2) + ' MB';
+            } else if (bytes > 1024) {
+              formatted = (bytes / 1024).toFixed(2) + ' KB';
+            } else if (bytes > 0) {
+              formatted = bytes + ' B';
+            }
+            document.getElementById('data-transferred').innerText = formatted;
+
+            // Format uptime
+            let sStr = stats.uptime;
+            let h = Math.floor(sStr / 3600);
+            let m = Math.floor((sStr % 3600) / 60);
+            let s = sStr % 60;
+            document.getElementById('uptime').innerText = `${h}h ${m}m ${s}s`;
+
+            // Draw log screen
+            const terminal = document.getElementById('terminal-screen');
+            terminal.innerHTML = '';
+            
+            if (stats.logs && stats.logs.length > 0) {
+              stats.logs.forEach(log => {
+                const row = document.createElement('div');
+                row.className = 'terminal-line';
+                
+                let classType = 'type-system';
+                if (log.type === 'INFO') classType = 'type-info';
+                else if (log.type === 'SUCCESS') classType = 'type-success';
+                else if (log.type === 'WARN') classType = 'type-warn';
+                else if (log.type === 'ERROR') classType = 'type-error';
+
+                row.innerHTML = `<span class="terminal-time">[${log.timestamp}]</span><span class="${classType}">[${log.type}]</span> ${log.message}`;
+                terminal.appendChild(row);
+              });
+            } else {
+              terminal.innerHTML = '<div class="terminal-line"><span class="terminal-time">[SYSTEM]</span> Listening for tunnel traffic...</div>';
+            }
+
+            // Always snap-scroll logs to bottom
+            terminal.scrollTop = terminal.scrollHeight;
+          }
+        } catch (err) {
+          console.error("Diagnostics polling error:", err);
+          document.getElementById('vps-status-dot').style.backgroundColor = '#ef4444';
+          document.getElementById('vps-status-dot').style.boxShadow = '0 0 10px #ef4444';
+          document.getElementById('vps-status-text').innerText = 'BRIDGE OFFLINE';
+          document.getElementById('vps-status-text').style.color = '#ef4444';
+        }
+      }
+
+      // Start automatic polling every 2 seconds
+      updateDiagnostics();
+      setInterval(updateDiagnostics, 2000);
+
+      document.getElementById('btn-refresh').addEventListener('click', updateDiagnostics);
+    }
+  </script>
+
 </body>
 </html>

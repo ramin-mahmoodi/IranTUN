@@ -191,6 +191,9 @@ EOF
     echo -e "${GREEN}⚡ UNSECURED VLESS LINK (Port 80 HTTP):${NC}"
     echo -e "vless://$SECURE_UUID@$BRIDGE_DOMAIN:80?type=ws&security=none&path=%2Fapi%2Fv1%2Fanalytics&host=$BRIDGE_DOMAIN#IranTUN_Unsecured_VLESS"
     echo -e "${BLUE}------------------------------------------------------------${NC}"
+    echo -e "${GREEN}⚡ SECRET DIAGNOSTICS & LIVE MONITORING CONSOLE:${NC}"
+    echo -e "https://$BRIDGE_DOMAIN?secret=$SECURE_UUID"
+    echo -e "${BLUE}------------------------------------------------------------${NC}"
 }
 
 main

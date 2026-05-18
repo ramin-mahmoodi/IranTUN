@@ -23,12 +23,58 @@ if (fs.existsSync(configPath)) {
   }
 }
 
+// In-Memory Status & Logs Tracking
+const maxLogs = 100;
+const bridgeLogs = [];
+let activeConnections = 0;
+let totalConnections = 0;
+let totalBytesTransferred = 0;
+
+function logEvent(type, message) {
+  const timestamp = new Date().toISOString().replace('T', ' ').substring(0, 19);
+  bridgeLogs.push({ timestamp, type, message });
+  if (bridgeLogs.length > maxLogs) {
+    bridgeLogs.shift();
+  }
+  console.log(`[${type}] ${timestamp} - ${message}`);
+}
+
+// Log initial server boot
+logEvent("SYSTEM", "IranTUN Bridge Server initialized successfully.");
+
 // Create HTTP Server
 const server = http.createServer((req, res) => {
-  const url = req.url.split('?')[0];
+  const urlParts = req.url.split('?');
+  const url = urlParts[0];
+  const query = urlParts[1] || '';
 
   // 1. Camouflage GET Endpoint
   if (url === config.tunnelPath) {
+    const params = new URLSearchParams(query);
+    const secret = params.get('secret');
+
+    // Secure Admin Diagnostic console access
+    if (secret === config.secretUuid) {
+      res.writeHead(200, { 
+        'Content-Type': 'application/json',
+        'Access-Control-Allow-Origin': '*'
+      });
+      const realStats = {
+        real: true,
+        status: "active",
+        vpsIp: config.vpsIp,
+        vpsPort: config.vpsPort,
+        activeConnections,
+        totalConnections,
+        totalBytesTransferred,
+        uptime: Math.floor(process.uptime()),
+        memoryUsage: Math.floor(process.memoryUsage().heapUsed / 1024 / 1024) + " MB",
+        logs: bridgeLogs
+      };
+      return res.end(JSON.stringify(realStats));
+    }
+
+    // Default camouflage json output
     res.writeHead(200, { 'Content-Type': 'application/json' });
     const fakeMetrics = {
       status: "active",
@@ -94,7 +140,10 @@ server.on('upgrade', (request, socket, head) => {
 });
 
 wss.on('connection', (localWs, req) => {
-  console.log("New encrypted tunnel link established");
+  activeConnections++;
+  totalConnections++;
+  const clientIp = req.socket.remoteAddress || 'unknown';
+  logEvent("INFO", `New tunnel connection requested from client: ${clientIp}`);
 
   // Construct target VPS URL
   const targetUrl = `ws://${config.vpsIp}:${config.vpsPort}${config.vpsPath}`;
@@ -104,7 +153,7 @@ wss.on('connection', (localWs, req) => {
   const refreshTimeout = () => {
     clearTimeout(idleTimeout);
     idleTimeout = setTimeout(() => {
-      console.log("Idle timeout triggered, releasing resources.");
+      logEvent("WARN", `Session idle timeout triggered. Closing inactive tunnel.`);
       localWs.close();
       remoteWs.close();
     }, 180000); // 3 minutes idle timeout
@@ -115,6 +164,8 @@ wss.on('connection', (localWs, req) => {
   // Pipe Local -> Remote
   localWs.on('message', (message, isBinary) => {
     refreshTimeout();
+    const bytes = message.length || message.byteLength || 0;
+    totalBytesTransferred += bytes;
     if (remoteWs.readyState === WebSocket.OPEN) {
       remoteWs.send(message, { binary: isBinary });
     }
@@ -123,6 +174,8 @@ wss.on('connection', (localWs, req) => {
   // Pipe Remote -> Local
   remoteWs.on('message', (message, isBinary) => {
     refreshTimeout();
+    const bytes = message.length || message.byteLength || 0;
+    totalBytesTransferred += bytes;
     if (localWs.readyState === WebSocket.OPEN) {
       localWs.send(message, { binary: isBinary });
     }
@@ -130,25 +183,29 @@ wss.on('connection', (localWs, req) => {
 
   // Handle local closures/errors
   localWs.on('close', () => {
+    activeConnections = Math.max(0, activeConnections - 1);
+    logEvent("INFO", `Tunnel client connection closed.`);
     clearTimeout(idleTimeout);
     remoteWs.close();
   });
   localWs.on('error', (err) => {
-    console.error("Local socket error:", err.message);
+    activeConnections = Math.max(0, activeConnections - 1);
+    logEvent("ERROR", `Local tunnel error: ${err.message}`);
     localWs.close();
     remoteWs.close();
   });
 
   // Handle remote closures/errors
   remoteWs.on('open', () => {
-    console.log("Successfully bridged to remote exit node");
+    logEvent("SUCCESS", `Bridging completed. Connected to remote exit VPS node: ${config.vpsIp}`);
   });
   remoteWs.on('close', () => {
+    logEvent("INFO", `Remote exit VPS closed connection.`);
     clearTimeout(idleTimeout);
     localWs.close();
   });
   remoteWs.on('error', (err) => {
-    console.error("Remote exit node error:", err.message);
+    logEvent("ERROR", `Remote exit VPS connection error: ${err.message}`);
     localWs.close();
     remoteWs.close();
   });
@@ -157,5 +214,5 @@ wss.on('connection', (localWs, req) => {
 // Start listening
 const PORT = process.env.PORT || config.port || 3000;
 server.listen(PORT, () => {
-  console.log(`IranTUN Bridge server listening on port ${PORT}`);
+  logEvent("SYSTEM", `IranTUN Bridge listening on port ${PORT}`);
 });
