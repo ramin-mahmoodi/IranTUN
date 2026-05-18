@@ -148,6 +148,9 @@ wss.on('connection', (localWs, req) => {
   // Construct target VPS URL
   const targetUrl = `ws://${config.vpsIp}:${config.vpsPort}${config.vpsPath}`;
   const remoteWs = new WebSocket(targetUrl);
+  
+  const bufferQueue = [];
+  let isRemoteOpen = false;
 
   let idleTimeout;
   const refreshTimeout = () => {
@@ -166,8 +169,11 @@ wss.on('connection', (localWs, req) => {
     refreshTimeout();
     const bytes = message.length || message.byteLength || 0;
     totalBytesTransferred += bytes;
-    if (remoteWs.readyState === WebSocket.OPEN) {
+    
+    if (isRemoteOpen && remoteWs.readyState === WebSocket.OPEN) {
       remoteWs.send(message, { binary: isBinary });
+    } else {
+      bufferQueue.push({ message, isBinary });
     }
   });
 
@@ -198,6 +204,14 @@ wss.on('connection', (localWs, req) => {
   // Handle remote closures/errors
   remoteWs.on('open', () => {
     logEvent("SUCCESS", `Bridging completed. Connected to remote exit VPS node: ${config.vpsIp}`);
+    isRemoteOpen = true;
+    // Flush buffered client handshakes
+    while (bufferQueue.length > 0) {
+      const item = bufferQueue.shift();
+      if (remoteWs.readyState === WebSocket.OPEN) {
+        remoteWs.send(item.message, { binary: item.isBinary });
+      }
+    }
   });
   remoteWs.on('close', () => {
     logEvent("INFO", `Remote exit VPS closed connection.`);
