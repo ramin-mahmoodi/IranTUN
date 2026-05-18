@@ -10,7 +10,7 @@ NC='\033[0m' # No Color
 
 print_banner() {
     echo -e "${BLUE}============================================================${NC}"
-    echo -e "${BLUE}      IranTUN - Interactive Bash Multi-Deployer             ${NC}"
+    echo -e "${BLUE}      IranTUN - Interactive Bash cPanel Deployer            ${NC}"
     echo -e "${BLUE}============================================================${NC}"
 }
 
@@ -71,28 +71,14 @@ main() {
         VPS_IP=$(prompt_input "Failed to auto-detect IP. Enter Foreign VPS IP Address")
     fi
     
-    echo -e "\n${YELLOW}--- Part 2: cPanel Bridge Configurations ---${NC}"
+    echo -e "\n${YELLOW}--- Part 2: cPanel FTP Configurations ---${NC}"
     BRIDGE_DOMAIN=$(prompt_input "Enter your cPanel Domain (e.g. yourdomain.com)")
-    
-    echo -e "\nSelect Deployment Method for cPanel Host:"
-    echo "1) Fully Automated (via SSH - Creates and configures Node.js app automatically)"
-    echo "2) Semi-Automated (via FTP - Uploads files, manual cPanel setup)"
-    METHOD=$(prompt_input "Enter choice (1 or 2)" "1")
+    FTP_HOST=$(prompt_input "Enter cPanel FTP Host" "ftp.$BRIDGE_DOMAIN")
+    FTP_USER=$(prompt_input "Enter FTP Username")
+    FTP_PASS=$(prompt_input "Enter FTP Password" "" "true")
 
     APP_ROOT=$(prompt_input "Enter Application Root Directory on cPanel" "irantun-bridge")
     APP_URI=$(prompt_input "Enter Application URI / Path" "/")
-
-    if [ "$METHOD" = "1" ]; then
-        echo -e "\n${YELLOW}--- Method 1 Selected: SSH Automated Deployment ---${NC}"
-        CP_SSH_HOST=$(prompt_input "Enter cPanel Host / Domain SSH Address" "$BRIDGE_DOMAIN")
-        CP_SSH_PORT=$(prompt_input "Enter cPanel SSH Port" "22")
-        CP_SSH_USER=$(prompt_input "Enter cPanel SSH Username")
-    else
-        echo -e "\n${YELLOW}--- Method 2 Selected: FTP Upload ---${NC}"
-        FTP_HOST=$(prompt_input "Enter cPanel FTP Host" "ftp.$BRIDGE_DOMAIN")
-        FTP_USER=$(prompt_input "Enter FTP Username")
-        FTP_PASS=$(prompt_input "Enter FTP Password" "" "true")
-    fi
 
     # 1. Connect to VPS and install Xray locally
     echo -e "\n${BLUE}--- Part 3: Deploying Exit Node locally on this VPS ---${NC}"
@@ -162,58 +148,23 @@ XRAY_CONF
 EOF
     echo -e "${GREEN}✓ host/config.json updated successfully.${NC}"
 
-    # 3. cPanel deployment
-    if [ "$METHOD" = "1" ]; then
-        echo -e "\n${BLUE}--- Part 4: Connecting to cPanel via SSH ---${NC}"
-        echo -e "${YELLOW}Connecting to $CP_SSH_USER@$CP_SSH_HOST:$CP_SSH_PORT...${NC}"
-        echo -e "${GREEN}Notice: You may be asked for your cPanel SSH password below.${NC}"
+    # 3. cPanel FTP deployment
+    echo -e "\n${BLUE}--- Part 4: Connecting to cPanel via FTP ---${NC}"
+    echo -e "${YELLOW}Uploading files to ftp://$FTP_HOST/$APP_ROOT...${NC}"
 
-        # Compress, stream, and extract files remotely in a single connection
-        echo "Archiving and uploading bridge files in a single SSH stream..."
-        tar -C host -czf - . | ssh -p "$CP_SSH_PORT" -o StrictHostKeyChecking=no "$CP_SSH_USER@$CP_SSH_HOST" "mkdir -p ~/$APP_ROOT && tar -xzf - -C ~/$APP_ROOT"
+    # Upload all files in a single curl execution to avoid multiple connection overheads
+    curl -u "$FTP_USER:$FTP_PASS" --ftp-create-dirs \
+        -T host/app.js "ftp://$FTP_HOST/$APP_ROOT/app.js" \
+        -T host/package.json "ftp://$FTP_HOST/$APP_ROOT/package.json" \
+        -T host/config.json "ftp://$FTP_HOST/$APP_ROOT/config.json" \
+        -T host/public/index.html "ftp://$FTP_HOST/$APP_ROOT/public/index.html" \
+        -T host/public/style.css "ftp://$FTP_HOST/$APP_ROOT/public/style.css"
 
-        # Register Node application
-        ssh -p "$CP_SSH_PORT" -o StrictHostKeyChecking=no "$CP_SSH_USER@$CP_SSH_HOST" "bash -s" <<EOF
-            echo "Detecting Node.js interpreter version..."
-            NODE_VER=\$(cloudlinux-selector interpreter --json --interpreter nodejs | grep -o '"available_versions":\[[^]]*\]' | grep -o '[0-9.]*' | tail -n1)
-            if [ -z "\$NODE_VER" ]; then
-                NODE_VER="20"
-            fi
-            
-            echo "Registering application with CloudLinux Selector (Node v\$NODE_VER)..."
-            cloudlinux-selector destroy --json --interpreter nodejs --app-root "$APP_ROOT" >/dev/null 2>&1
-            cloudlinux-selector create --json --interpreter nodejs --version "\$NODE_VER" --app-root "$APP_ROOT" --domain "$BRIDGE_DOMAIN" --app-uri "$APP_URI" --startup-file app.js
-            
-            echo "Installing packages (npm install)..."
-            cloudlinux-selector install-modules --json --interpreter nodejs --app-root "$APP_ROOT"
-            
-            echo "Restarting Node.js App..."
-            cloudlinux-selector restart --json --interpreter nodejs --app-root "$APP_ROOT"
-            echo "✓ App setup complete!"
-EOF
-        if [ $? -eq 0 ]; then
-            echo -e "${GREEN}✓ Bridge deployment on cPanel active automatically!${NC}"
-        else
-            echo -e "${RED}✗ Automated cPanel setup completed with warnings.${NC}"
-        fi
+    if [ $? -eq 0 ]; then
+        echo -e "${GREEN}✓ All files uploaded successfully via FTP!${NC}"
     else
-        echo -e "\n${BLUE}--- Part 4: Connecting to cPanel via FTP ---${NC}"
-        echo -e "${YELLOW}Uploading files to ftp://$FTP_HOST/$APP_ROOT...${NC}"
-
-        # Upload all files in a single curl execution to avoid multiple connection overheads
-        curl -u "$FTP_USER:$FTP_PASS" --ftp-create-dirs \
-            -T host/app.js "ftp://$FTP_HOST/$APP_ROOT/app.js" \
-            -T host/package.json "ftp://$FTP_HOST/$APP_ROOT/package.json" \
-            -T host/config.json "ftp://$FTP_HOST/$APP_ROOT/config.json" \
-            -T host/public/index.html "ftp://$FTP_HOST/$APP_ROOT/public/index.html" \
-            -T host/public/style.css "ftp://$FTP_HOST/$APP_ROOT/public/style.css"
-
-        if [ $? -eq 0 ]; then
-            echo -e "${GREEN}✓ All files uploaded successfully via FTP!${NC}"
-        else
-            echo -e "${RED}✗ FTP upload failed! Make sure your credentials and host path are correct.${NC}"
-            exit 1
-        fi
+        echo -e "${RED}✗ FTP upload failed! Make sure your FTP credentials and host path are correct.${NC}"
+        exit 1
     fi
 
     # Output Client links
@@ -221,18 +172,16 @@ EOF
     echo -e "${GREEN}🎉 IRANTUN TUNNEL INTEGRATION COMPLETED SUCCESSFULLY! 🎉${NC}"
     echo -e "${GREEN}============================================================${NC}"
 
-    if [ "$METHOD" = "2" ]; then
-        echo -e "\n${YELLOW}📝 MANUAL CPANEL SETUP INSTRUCTIONS:${NC}"
-        echo "Please finalize the Node.js application registration in your cPanel UI:"
-        echo "1) Open 'Setup Node.js App' in your cPanel dashboard."
-        echo "2) Click 'Create Application'."
-        echo "3) Enter the following values:"
-        echo "   - Application root: $APP_ROOT"
-        echo "   - Application URL: Select $BRIDGE_DOMAIN and set path to '$APP_URI'"
-        echo "   - Application startup file: app.js"
-        echo "4) Click 'CREATE' on the top-right corner."
-        echo "5) Click the 'Run NPM Install' button to install dependencies."
-    fi
+    echo -e "\n${YELLOW}📝 MANUAL CPANEL SETUP INSTRUCTIONS:${NC}"
+    echo "Since shared hosts do not have SSH, please finalize the Node.js application registration in cPanel UI:"
+    echo "1) Open 'Setup Node.js App' in your cPanel dashboard."
+    echo "2) Click 'Create Application'."
+    echo "3) Enter the following values:"
+    echo "   - Application root: $APP_ROOT"
+    echo "   - Application URL: Select $BRIDGE_DOMAIN and set path to '$APP_URI'"
+    echo "   - Application startup file: app.js"
+    echo "4) Click 'CREATE' on the top-right corner."
+    echo "5) Click the 'Run NPM Install' button to fetch dependencies."
 
     echo -e "\nReady-to-use Client Configurations:"
     echo -e "${BLUE}------------------------------------------------------------${NC}"
