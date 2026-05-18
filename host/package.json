@@ -1,5 +1,5 @@
 {
-  "name": "duud-tunnel-host",
+  "name": "irantun-bridge",
   "version": "1.0.0",
   "description": "Secure High-Speed Node.js WebSocket Bridge with dummy camouflage site",
   "main": "app.js",
@@ -9,6 +9,6 @@
   "dependencies": {
     "ws": "^8.16.0"
   },
-  "author": "Duud",
+  "author": "IranTUN",
   "license": "MIT"
 }

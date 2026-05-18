@@ -6,11 +6,11 @@ const WebSocket = require('ws');
 // Load configurations
 const configPath = path.join(__dirname, 'config.json');
 let config = {
-  vpsIp: "104.105.26.61",
+  vpsIp: "YOUR_VPS_IP",
   vpsPort: 8080,
   vpsPath: "/metrics",
   tunnelPath: "/api/v1/analytics",
-  secretUuid: "cc654e3d-71b5-4a6c-b3a2-a3962b8a07c1",
+  secretUuid: "YOUR_UUID_HERE",
   port: 3000
 };
 
@@ -157,5 +157,5 @@ wss.on('connection', (localWs, req) => {
 // Start listening
 const PORT = process.env.PORT || config.port || 3000;
 server.listen(PORT, () => {
-  console.log(`Duud Tunnel server listening on port ${PORT}`);
+  console.log(`IranTUN Bridge server listening on port ${PORT}`);
 });
