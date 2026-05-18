@@ -24,7 +24,6 @@ sudo bash deploy.sh
 
 This script will:
 1. Detect the VPS public IP automatically and install & configure Xray VLESS-WS on port 8080 locally on this server.
-2. Ask if you want to deploy the bridge to cPanel via **Fully Automated SSH** (Method 1: registers Node.js app automatically on CloudLinux selector!) or **Semi-Automated FTP** (Method 2: uploads files and gives direct cPanel GUI setup steps).
+2. Ask for your cPanel FTP credentials and target directory to upload all the bridge application and camouflage files automatically.
 3. Generate a brand new secure random VLESS UUID dynamically.
-4. Upload all the bridge application and camouflage files to your targeted host path.
-5. Print ready-to-import client VLESS links in your terminal.
+4. Print ready-to-import client VLESS links in your terminal along with simple manual setup steps to activate the Node.js application in your cPanel dashboard.
