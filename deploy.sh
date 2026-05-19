@@ -111,6 +111,8 @@ main() {
     if [ "$VPS_PROTOCOL" = "wss" ]; then
         echo "Generating self-signed SSL certificate for VPS..."
         openssl req -newkey rsa:2048 -nodes -keyout /usr/local/etc/xray/vps.key -x509 -days 365 -out /usr/local/etc/xray/vps.crt -subj "/CN=irantun-vps"
+        chmod 755 /usr/local/etc/xray
+        chmod 644 /usr/local/etc/xray/vps.key /usr/local/etc/xray/vps.crt
     fi
 
     echo "Configuring VLESS inbound on port $VPS_PORT..."
