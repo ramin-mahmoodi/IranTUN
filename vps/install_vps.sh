@@ -76,7 +76,7 @@ mkdir -p "$CONFIG_DIR"
 
 if [ "$VPS_PROTOCOL" = "wss" ]; then
   echo "Generating self-signed SSL certificate for VPS..."
-  openssl req -newkey rsa:2048 -nodes -keyout /usr/local/etc/xray/vps.key -x509 -days 365 -out /usr/local/etc/xray/vps.crt -subj "/CN=irantun-vps"
+  openssl req -newkey rsa:2048 -nodes -keyout /usr/local/etc/xray/vps.key -x509 -days 365 -out /usr/local/etc/xray/vps.crt -subj "/C=US/ST=CA/L=Los Angeles/O=Speedtest Inc/CN=www.speedtest.net"
   chmod 755 /usr/local/etc/xray
   chmod 644 /usr/local/etc/xray/vps.key /usr/local/etc/xray/vps.crt
 fi
