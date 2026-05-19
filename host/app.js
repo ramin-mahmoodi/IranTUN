@@ -205,9 +205,9 @@ wss.on('connection', (localWs, req) => {
     clearTimeout(idleTimeout);
     idleTimeout = setTimeout(() => {
       logEvent("WARN", `Session idle timeout triggered. Closing inactive tunnel.`);
-      localWs.close();
-      remoteWs.close();
-    }, 180000); // 3 minutes idle timeout
+      localWs.terminate();
+      remoteWs.terminate();
+    }, 30000); // 30 seconds idle timeout (VLESS keepalive is 10s)
   };
 
   refreshTimeout();
@@ -240,13 +240,13 @@ wss.on('connection', (localWs, req) => {
     activeConnections = Math.max(0, activeConnections - 1);
     logEvent("INFO", `Tunnel client connection closed.`);
     clearTimeout(idleTimeout);
-    remoteWs.close();
+    remoteWs.terminate();
   });
   localWs.on('error', (err) => {
     activeConnections = Math.max(0, activeConnections - 1);
     logEvent("ERROR", `Local tunnel error: ${err.message}`);
-    localWs.close();
-    remoteWs.close();
+    localWs.terminate();
+    remoteWs.terminate();
   });
 
   let pingInterval;
@@ -279,13 +279,13 @@ wss.on('connection', (localWs, req) => {
     if (pingInterval) clearInterval(pingInterval);
     logEvent("INFO", `Remote exit VPS closed connection.`);
     clearTimeout(idleTimeout);
-    localWs.close();
+    localWs.terminate();
   });
   remoteWs.on('error', (err) => {
     if (pingInterval) clearInterval(pingInterval);
     logEvent("ERROR", `Remote exit VPS connection error: ${err.message}`);
-    localWs.close();
-    remoteWs.close();
+    localWs.terminate();
+    remoteWs.terminate();
   });
 });
 
