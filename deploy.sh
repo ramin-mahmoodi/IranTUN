@@ -164,9 +164,20 @@ XRAY_CONF
         echo -e "${RED}⚠ Warning: Xray service failed to start or state is unknown.${NC}"
     fi
 
-    # 2. Write local config.json locally for deployment
-    echo -e "\n${BLUE}Generating bridge config file...${NC}"
-    cat <<EOF > host/config.json
+    # 2. Setup temporary workspace and download bridge files
+    echo -e "\n${BLUE}Preparing temporary workspace...${NC}"
+    TEMP_DIR=$(mktemp -d -t irantun-XXXXXXXXXX)
+    mkdir -p "$TEMP_DIR/host/public"
+    
+    GITHUB_RAW="https://raw.githubusercontent.com/ramin-mahmoodi/IranTUN/main"
+    echo "Downloading latest bridge files from GitHub..."
+    curl -s -L "$GITHUB_RAW/host/app.js" -o "$TEMP_DIR/host/app.js"
+    curl -s -L "$GITHUB_RAW/host/package.json" -o "$TEMP_DIR/host/package.json"
+    curl -s -L "$GITHUB_RAW/host/public/index.html" -o "$TEMP_DIR/host/public/index.html"
+    curl -s -L "$GITHUB_RAW/host/public/style.css" -o "$TEMP_DIR/host/public/style.css"
+
+    echo -e "${BLUE}Generating bridge config file...${NC}"
+    cat <<EOF > "$TEMP_DIR/host/config.json"
 {
   "vpsIp": "$VPS_IP",
   "vpsPort": $VPS_PORT,
@@ -177,7 +188,7 @@ XRAY_CONF
   "port": 3000
 }
 EOF
-    echo -e "${GREEN}✓ host/config.json updated successfully.${NC}"
+    echo -e "${GREEN}✓ config.json generated successfully.${NC}"
 
     # 3. cPanel FTP deployment
     echo -e "\n${BLUE}--- Part 4: Connecting to cPanel via FTP ---${NC}"
@@ -185,18 +196,22 @@ EOF
 
     # Upload all files in a single curl execution to avoid multiple connection overheads
     curl -u "$FTP_USER:$FTP_PASS" --ftp-create-dirs \
-        -T host/app.js "ftp://$FTP_HOST/$APP_ROOT/app.js" \
-        -T host/package.json "ftp://$FTP_HOST/$APP_ROOT/package.json" \
-        -T host/config.json "ftp://$FTP_HOST/$APP_ROOT/config.json" \
-        -T host/public/index.html "ftp://$FTP_HOST/$APP_ROOT/public/index.html" \
-        -T host/public/style.css "ftp://$FTP_HOST/$APP_ROOT/public/style.css"
+        -T "$TEMP_DIR/host/app.js" "ftp://$FTP_HOST/$APP_ROOT/app.js" \
+        -T "$TEMP_DIR/host/package.json" "ftp://$FTP_HOST/$APP_ROOT/package.json" \
+        -T "$TEMP_DIR/host/config.json" "ftp://$FTP_HOST/$APP_ROOT/config.json" \
+        -T "$TEMP_DIR/host/public/index.html" "ftp://$FTP_HOST/$APP_ROOT/public/index.html" \
+        -T "$TEMP_DIR/host/public/style.css" "ftp://$FTP_HOST/$APP_ROOT/public/style.css"
 
     if [ $? -eq 0 ]; then
         echo -e "${GREEN}✓ All files uploaded successfully via FTP!${NC}"
     else
         echo -e "${RED}✗ FTP upload failed! Make sure your FTP credentials and host path are correct.${NC}"
+        rm -rf "$TEMP_DIR"
         exit 1
     fi
+
+    # Clean up temporary workspace
+    rm -rf "$TEMP_DIR"
 
     # Output Client links
     echo -e "\n${GREEN}============================================================${NC}"
