@@ -164,6 +164,7 @@ const wss = new WebSocket.Server({
 });
 
 server.on('upgrade', (request, socket, head) => {
+  socket.setNoDelay(true); // Disable Nagle's algorithm for raw upgrade socket
   const pathname = request.url.split('?')[0];
 
   // Intercept the tunnel path only
@@ -177,6 +178,9 @@ server.on('upgrade', (request, socket, head) => {
 });
 
 wss.on('connection', (localWs, req) => {
+  if (localWs._socket) {
+    localWs._socket.setNoDelay(true); // Disable Nagle's algorithm for local WS socket
+  }
   activeConnections++;
   totalConnections++;
   const clientIp = req.socket.remoteAddress || 'unknown';
@@ -247,6 +251,9 @@ wss.on('connection', (localWs, req) => {
 
   // Handle remote closures/errors
   remoteWs.on('open', () => {
+    if (remoteWs._socket) {
+      remoteWs._socket.setNoDelay(true); // Disable Nagle's algorithm for VPS exit WS connection
+    }
     logEvent("SUCCESS", `Bridging completed. Connected to remote exit VPS node: ${config.vpsIp}`);
     isRemoteOpen = true;
     // Flush buffered client handshakes
