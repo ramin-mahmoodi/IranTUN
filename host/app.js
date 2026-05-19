@@ -260,8 +260,20 @@ wss.on('connection', (localWs, req) => {
     logEvent("SUCCESS", `Bridging completed. Connected to remote exit VPS node: ${config.vpsIp}`);
     isRemoteOpen = true;
 
-    // Send active WebSocket pings every 10 seconds to prevent NAT firewall timeouts
+    let isAlive = true;
+    remoteWs.on('pong', () => {
+      isAlive = true;
+    });
+
+    // Send active WebSocket pings every 10 seconds with zombie detection
     pingInterval = setInterval(() => {
+      if (!isAlive) {
+        logEvent("WARN", `VPS connection heartbeat failed. Terminating zombie socket.`);
+        localWs.terminate();
+        remoteWs.terminate();
+        return;
+      }
+      isAlive = false;
       if (remoteWs.readyState === WebSocket.OPEN) {
         remoteWs.ping();
       }
