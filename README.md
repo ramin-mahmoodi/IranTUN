@@ -16,18 +16,16 @@ An ultra-high-speed, serverless, and CPU-efficient WebSocket VLESS proxy tunnel 
 
 ## 🛠️ Interactive One-Click Installation
 
-To deploy the entire system (both the Foreign VPS exit node and your Iran cPanel Host), simply run the interactive Bash installer directly on your **Foreign VPS** as `root`:
+To deploy the entire system (both the Foreign VPS exit node and your Iran cPanel Host), simply run the interactive Bash installer directly on your **Foreign VPS** as `root` without any repository cloning:
 
 ```bash
-git clone https://github.com/ramin-mahmoodi/IranTUN.git
-cd IranTUN
-sudo bash deploy.sh
+bash <(curl -fsSL https://raw.githubusercontent.com/ramin-mahmoodi/IranTUN/main/deploy.sh)
 ```
 
 This script will:
 1. Prompt you to choose the bridge connection protocol:
    - **Plain WebSocket (ws)**: Runs on port `8080` (Fast but vulnerable to DPI throttling).
-   - **Secure WebSocket (wss)**: Runs on port `8443` (Encrypted using a dynamically generated self-signed TLS certificate to bypass DPI).
+   - **Secure WebSocket (wss)**: Runs on port `8443` (Encrypted using a self-signed TLS certificate matching your cPanel domain to bypass DPI).
 2. Ask for your cPanel FTP credentials and target directory to upload all the bridge application and camouflage files automatically.
 3. Generate a brand new secure random VLESS UUID dynamically.
 4. Print ready-to-import client VLESS links in your terminal along with simple manual setup steps to activate the Node.js application in your cPanel dashboard.
