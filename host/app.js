@@ -249,13 +249,24 @@ wss.on('connection', (localWs, req) => {
     remoteWs.close();
   });
 
+  let pingInterval;
+
   // Handle remote closures/errors
   remoteWs.on('open', () => {
     if (remoteWs._socket) {
       remoteWs._socket.setNoDelay(true); // Disable Nagle's algorithm for VPS exit WS connection
+      remoteWs._socket.setKeepAlive(true, 10000); // Enable TCP Keep-Alive every 10 seconds
     }
     logEvent("SUCCESS", `Bridging completed. Connected to remote exit VPS node: ${config.vpsIp}`);
     isRemoteOpen = true;
+
+    // Send active WebSocket pings every 10 seconds to prevent NAT firewall timeouts
+    pingInterval = setInterval(() => {
+      if (remoteWs.readyState === WebSocket.OPEN) {
+        remoteWs.ping();
+      }
+    }, 10000);
+
     // Flush buffered client handshakes
     while (bufferQueue.length > 0) {
       const item = bufferQueue.shift();
@@ -265,11 +276,13 @@ wss.on('connection', (localWs, req) => {
     }
   });
   remoteWs.on('close', () => {
+    if (pingInterval) clearInterval(pingInterval);
     logEvent("INFO", `Remote exit VPS closed connection.`);
     clearTimeout(idleTimeout);
     localWs.close();
   });
   remoteWs.on('error', (err) => {
+    if (pingInterval) clearInterval(pingInterval);
     logEvent("ERROR", `Remote exit VPS connection error: ${err.message}`);
     localWs.close();
     remoteWs.close();
