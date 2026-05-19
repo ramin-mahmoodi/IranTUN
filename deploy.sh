@@ -71,6 +71,29 @@ main() {
         VPS_IP=$(prompt_input "Failed to auto-detect IP. Enter Foreign VPS IP Address")
     fi
     
+    echo -e "\nChoose connection protocol between Bridge (cPanel) and this VPS:"
+    echo "1) Plain WebSocket (ws) - Unencrypted, vulnerable to DPI throttling"
+    echo "2) Secure WebSocket (wss) - Encrypted using TLS with self-signed certificate (recommended)"
+    read -p "Select option [2]: " PROTO_OPTION
+    if [ "$PROTO_OPTION" = "1" ]; then
+        VPS_PROTOCOL="ws"
+        VPS_PORT=8080
+        TLS_CONFIG_BLOCK=""
+    else
+        VPS_PROTOCOL="wss"
+        VPS_PORT=8443
+        TLS_CONFIG_BLOCK=',
+        "security": "tls",
+        "tlsSettings": {
+          "certificates": [
+            {
+              "certificateFile": "/usr/local/etc/xray/vps.crt",
+              "keyFile": "/usr/local/etc/xray/vps.key"
+            }
+          ]
+        }'
+    fi
+
     echo -e "\n${YELLOW}--- Part 2: cPanel FTP Configurations ---${NC}"
     BRIDGE_DOMAIN=$(prompt_input "Enter your cPanel Domain (e.g. yourdomain.com)")
     FTP_HOST=$(prompt_input "Enter cPanel FTP Host" "ftp.$BRIDGE_DOMAIN")
@@ -85,14 +108,19 @@ main() {
     echo "Installing Xray-core..."
     bash -c "$(curl -L https://github.com/XTLS/Xray-install/raw/main/install-release.sh)" @ install
     
-    echo "Configuring VLESS inbound on port 8080..."
+    if [ "$VPS_PROTOCOL" = "wss" ]; then
+        echo "Generating self-signed SSL certificate for VPS..."
+        openssl req -newkey rsa:2048 -nodes -keyout /usr/local/etc/xray/vps.key -x509 -days 365 -out /usr/local/etc/xray/vps.crt -subj "/CN=irantun-vps"
+    fi
+
+    echo "Configuring VLESS inbound on port $VPS_PORT..."
     mkdir -p /usr/local/etc/xray
     cat <<XRAY_CONF > /usr/local/etc/xray/config.json
 {
   "log": { "loglevel": "warning" },
   "inbounds": [
     {
-      "port": 8080,
+      "port": $VPS_PORT,
       "protocol": "vless",
       "settings": {
         "clients": [
@@ -106,7 +134,7 @@ main() {
       },
       "streamSettings": {
         "network": "ws",
-        "wsSettings": { "path": "/metrics" }
+        "wsSettings": { "path": "/metrics" }$TLS_CONFIG_BLOCK
       }
     }
   ],
@@ -139,7 +167,8 @@ XRAY_CONF
     cat <<EOF > host/config.json
 {
   "vpsIp": "$VPS_IP",
-  "vpsPort": 8080,
+  "vpsPort": $VPS_PORT,
+  "vpsProtocol": "$VPS_PROTOCOL",
   "vpsPath": "/metrics",
   "tunnelPath": "/api/v1/analytics",
   "secretUuid": "$SECURE_UUID",

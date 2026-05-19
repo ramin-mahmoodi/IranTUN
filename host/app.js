@@ -8,6 +8,7 @@ const configPath = path.join(__dirname, 'config.json');
 let config = {
   vpsIp: "YOUR_VPS_IP",
   vpsPort: 8080,
+  vpsProtocol: "ws",
   vpsPath: "/metrics",
   tunnelPath: "/api/v1/analytics",
   secretUuid: "YOUR_UUID_HERE",
@@ -55,6 +56,37 @@ const server = http.createServer((req, res) => {
 
     // Secure Admin Diagnostic console access
     if (secret === config.secretUuid) {
+      if (req.method === 'POST') {
+        let body = '';
+        req.on('data', chunk => {
+          body += chunk.toString();
+        });
+        req.on('end', () => {
+          try {
+            const newConfig = JSON.parse(body);
+            if (!newConfig.vpsIp || !newConfig.vpsPort) {
+              res.writeHead(400, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' });
+              return res.end(JSON.stringify({ error: "Missing VPS IP or Port" }));
+            }
+            config.vpsIp = newConfig.vpsIp;
+            config.vpsPort = parseInt(newConfig.vpsPort);
+            config.vpsProtocol = newConfig.vpsProtocol || 'ws';
+            config.vpsPath = newConfig.vpsPath || '/metrics';
+            
+            fs.writeFileSync(configPath, JSON.stringify(config, null, 2));
+            logEvent("SYSTEM", `Configuration updated via Web Console. New target: ${config.vpsProtocol}://${config.vpsIp}:${config.vpsPort}${config.vpsPath}`);
+            
+            res.writeHead(200, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' });
+            return res.end(JSON.stringify({ success: true }));
+          } catch (err) {
+            logEvent("ERROR", `Failed to save configuration: ${err.message}`);
+            res.writeHead(500, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' });
+            return res.end(JSON.stringify({ error: err.message }));
+          }
+        });
+        return;
+      }
+
       res.writeHead(200, { 
         'Content-Type': 'application/json',
         'Access-Control-Allow-Origin': '*'
@@ -64,6 +96,8 @@ const server = http.createServer((req, res) => {
         status: "active",
         vpsIp: config.vpsIp,
         vpsPort: config.vpsPort,
+        vpsProtocol: config.vpsProtocol || "ws",
+        vpsPath: config.vpsPath || "/metrics",
         activeConnections,
         totalConnections,
         totalBytesTransferred,
@@ -149,10 +183,15 @@ wss.on('connection', (localWs, req) => {
   logEvent("INFO", `New tunnel connection requested from client: ${clientIp}`);
 
   // Construct target VPS URL
-  const targetUrl = `ws://${config.vpsIp}:${config.vpsPort}${config.vpsPath}`;
-  const remoteWs = new WebSocket(targetUrl, {
+  const protocol = config.vpsProtocol || 'ws';
+  const targetUrl = `${protocol}://${config.vpsIp}:${config.vpsPort}${config.vpsPath}`;
+  const wsOptions = {
     perMessageDeflate: false
-  });
+  };
+  if (protocol === 'wss') {
+    wsOptions.rejectUnauthorized = false; // Allow self-signed certificates
+  }
+  const remoteWs = new WebSocket(targetUrl, wsOptions);
   
   const bufferQueue = [];
   let isRemoteOpen = false;

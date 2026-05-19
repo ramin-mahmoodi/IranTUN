@@ -115,6 +115,38 @@
         <div class="terminal-line"><span class="terminal-time">[SYSTEM]</span> Initializing console auditing terminal...</div>
       </div>
     </div>
+
+    <!-- Bridge Settings Panel -->
+    <div class="console-container" style="margin-top: 2rem;">
+      <div class="console-header">
+        <h2>Bridge Configuration Panel</h2>
+      </div>
+      <form id="settings-form" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1.5rem; margin-top: 1rem;">
+        <div>
+          <label style="display: block; font-size: 0.8rem; color: var(--text-muted); margin-bottom: 0.5rem; text-transform: uppercase;">VPS IP / Domain</label>
+          <input type="text" id="vps-ip-input" required style="width: 100%; padding: 0.75rem; background: rgba(255,255,255,0.03); border: 1px solid var(--border-color); border-radius: 8px; color: var(--text-main); font-family: inherit;">
+        </div>
+        <div>
+          <label style="display: block; font-size: 0.8rem; color: var(--text-muted); margin-bottom: 0.5rem; text-transform: uppercase;">VPS Port</label>
+          <input type="number" id="vps-port-input" required style="width: 100%; padding: 0.75rem; background: rgba(255,255,255,0.03); border: 1px solid var(--border-color); border-radius: 8px; color: var(--text-main); font-family: inherit;">
+        </div>
+        <div>
+          <label style="display: block; font-size: 0.8rem; color: var(--text-muted); margin-bottom: 0.5rem; text-transform: uppercase;">Protocol</label>
+          <select id="vps-protocol-input" style="width: 100%; padding: 0.75rem; background: rgba(255,255,255,0.03); border: 1px solid var(--border-color); border-radius: 8px; color: var(--text-main); font-family: inherit;">
+            <option value="ws" style="background-color: var(--bg-primary);">Plain WS (ws://)</option>
+            <option value="wss" style="background-color: var(--bg-primary);">Secure WSS (wss://)</option>
+          </select>
+        </div>
+        <div>
+          <label style="display: block; font-size: 0.8rem; color: var(--text-muted); margin-bottom: 0.5rem; text-transform: uppercase;">WebSocket Path</label>
+          <input type="text" id="vps-path-input" required style="width: 100%; padding: 0.75rem; background: rgba(255,255,255,0.03); border: 1px solid var(--border-color); border-radius: 8px; color: var(--text-main); font-family: inherit;">
+        </div>
+        <div style="grid-column: 1 / -1; display: flex; align-items: center; gap: 1.5rem; border-top: 1px solid rgba(255,255,255,0.06); padding-top: 1.5rem;">
+          <button type="submit" class="cta-btn" style="padding: 0.75rem 2rem;">Save & Apply Settings</button>
+          <span id="save-status-msg" style="font-weight: 600; font-size: 0.9rem;"></span>
+        </div>
+      </form>
+    </div>
   </div>
 
   <script>
@@ -123,6 +155,8 @@
     const secret = urlParams.get('secret');
 
     if (secret) {
+      let configLoaded = false;
+
       // Hide all standard web content
       document.querySelector('header').style.display = 'none';
       document.querySelector('.hero').style.display = 'none';
@@ -155,6 +189,15 @@
             
             // Format Memory Usage
             document.getElementById('memory-usage').innerText = stats.memoryUsage;
+
+            // Load settings into inputs once
+            if (!configLoaded) {
+              document.getElementById('vps-ip-input').value = stats.vpsIp || '';
+              document.getElementById('vps-port-input').value = stats.vpsPort || '';
+              document.getElementById('vps-protocol-input').value = stats.vpsProtocol || 'ws';
+              document.getElementById('vps-path-input').value = stats.vpsPath || '/metrics';
+              configLoaded = true;
+            }
 
             // Format bytes
             let bytes = stats.totalBytesTransferred;
@@ -216,6 +259,47 @@
       setInterval(updateDiagnostics, 2000);
 
       document.getElementById('btn-refresh').addEventListener('click', updateDiagnostics);
+
+      // Handle settings update form submission
+      const settingsForm = document.getElementById('settings-form');
+      const saveStatusMsg = document.getElementById('save-status-msg');
+
+      settingsForm.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        saveStatusMsg.innerText = "Saving settings & applying dynamically...";
+        saveStatusMsg.style.color = "var(--text-muted)";
+
+        const payload = {
+          vpsIp: document.getElementById('vps-ip-input').value.trim(),
+          vpsPort: parseInt(document.getElementById('vps-port-input').value.trim()),
+          vpsProtocol: document.getElementById('vps-protocol-input').value,
+          vpsPath: document.getElementById('vps-path-input').value.trim()
+        };
+
+        try {
+          const response = await fetch(`/api/v1/analytics?secret=${secret}`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(payload)
+          });
+
+          const result = await response.json();
+          if (response.ok && result.success) {
+            saveStatusMsg.innerText = "✓ Settings Saved & Applied Instantly!";
+            saveStatusMsg.style.color = "#10b981";
+            setTimeout(() => {
+              saveStatusMsg.innerText = "";
+            }, 5000);
+          } else {
+            throw new Error(result.error || "Failed to update configuration");
+          }
+        } catch (err) {
+          saveStatusMsg.innerText = "✗ Error: " + err.message;
+          saveStatusMsg.style.color = "#ef4444";
+        }
+      });
     }
   </script>
 

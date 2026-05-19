@@ -33,8 +33,32 @@ if [ -z "$BRIDGE_DOMAIN" ]; then
   BRIDGE_DOMAIN="yourdomain.com"
 fi
 
+echo -e "\nChoose connection protocol between Bridge (cPanel) and this VPS:"
+echo "1) Plain WebSocket (ws) - Unencrypted, port 8080"
+echo "2) Secure WebSocket (wss) - Encrypted using TLS with self-signed certificate, port 8443 (recommended)"
+read -p "Select option [2]: " PROTO_OPTION
+if [ "$PROTO_OPTION" = "1" ]; then
+  VPS_PROTOCOL="ws"
+  VPS_PORT=8080
+  TLS_CONFIG_BLOCK=""
+else
+  VPS_PROTOCOL="wss"
+  VPS_PORT=8443
+  TLS_CONFIG_BLOCK=',
+        "security": "tls",
+        "tlsSettings": {
+          "certificates": [
+            {
+              "certificateFile": "/usr/local/etc/xray/vps.crt",
+              "keyFile": "/usr/local/etc/xray/vps.key"
+            }
+          ]
+        }'
+fi
+
 echo -e "${BLUE}Using UUID: ${GREEN}$USER_UUID${NC}"
 echo -e "${BLUE}Using Domain: ${GREEN}$BRIDGE_DOMAIN${NC}"
+echo -e "${BLUE}Using Protocol: ${GREEN}$VPS_PROTOCOL${NC} on port ${GREEN}$VPS_PORT${NC}"
 
 echo -e "${BLUE}[1/4] Installing Xray-core officially...${NC}"
 bash -c "$(curl -L https://github.com/XTLS/Xray-install/raw/main/install-release.sh)" @ install
@@ -50,6 +74,11 @@ echo -e "${BLUE}[2/4] Injecting secure VLESS-WS configurations...${NC}"
 CONFIG_DIR="/usr/local/etc/xray"
 mkdir -p "$CONFIG_DIR"
 
+if [ "$VPS_PROTOCOL" = "wss" ]; then
+  echo "Generating self-signed SSL certificate for VPS..."
+  openssl req -newkey rsa:2048 -nodes -keyout /usr/local/etc/xray/vps.key -x509 -days 365 -out /usr/local/etc/xray/vps.crt -subj "/CN=irantun-vps"
+fi
+
 cat << EOF > "$CONFIG_DIR/config.json"
 {
   "log": {
@@ -57,7 +86,7 @@ cat << EOF > "$CONFIG_DIR/config.json"
   },
   "inbounds": [
     {
-      "port": 8080,
+      "port": $VPS_PORT,
       "protocol": "vless",
       "settings": {
         "clients": [
@@ -73,7 +102,7 @@ cat << EOF > "$CONFIG_DIR/config.json"
         "network": "ws",
         "wsSettings": {
           "path": "/metrics"
-        }
+        }$TLS_CONFIG_BLOCK
       }
     }
   ],
