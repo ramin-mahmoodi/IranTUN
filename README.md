@@ -23,7 +23,7 @@ This project completely eliminates the need for expensive domestic intermediary 
 * **Serverless Architecture**: Your clients connect directly to your Iranian cPanel host, which securely bridges traffic to your Foreign VPS (Exit Node). No domestic VPS needed!
 * **Multi-Domain Management**: Deploy the Node.js bridge across multiple cPanel hosts and manage all your domains from a single CLI menu to generate load-balanced VLESS links!
 * **Multi-User Management CLI**: Easily create, manage, and delete multiple users directly from the Linux VPS terminal using the built-in `irantun` command.
-* **Cloudflare WARP Integration**: Automatically routes outgoing traffic from your VPS through Cloudflare WARP (SOCKS5), hiding your real VPS IP from target sites and preventing blocks from services like Netflix or ChatGPT.
+* **WireProxy (WARP) Integration**: Automatically generates a free WARP account and uses the ultra-lightweight WireProxy to route outgoing traffic from your VPS through Cloudflare WARP (SOCKS5). This hides your real VPS IP without installing the heavy, network-intrusive official Cloudflare daemon.
 * **Adaptive Upload (Batching)**: A smart buffering algorithm designed specifically for cPanel limits. It queues small packets and flushes them in bursts, exponentially increasing upload speeds on congested networks while keeping CPU usage at **0.00%**.
 * **100% Camouflage Portfolio**: Serves a beautiful, interactive tech-startup landing page at your root domain (`https://yourdomain.com/`) to easily pass hosting manual reviews.
 * **Anti-DPI Secure WebSocket (WSS)**: Wraps VLESS-WS traffic in TLS using automatically generated self-signed SSL certificates, encrypting headers at the transport layer to bypass Deep Packet Inspection (DPI).
@@ -37,7 +37,7 @@ IranTUN operates on a **Forward-Proxy** model with strict separation of concerns
 
 1. **The Client (V2rayNG/Nekobox)**: Connects to your Iranian cPanel Domain on standard Web Ports (443/80).
 2. **The cPanel Bridge (`app.js`)**: A lightweight Node.js script. It has **zero knowledge** of your VLESS UUIDs. It simply takes the encrypted WebSocket traffic and aggressively forwards it to your Foreign VPS.
-3. **The VPS Exit Node (Xray-core)**: Receives the WSS traffic, authenticates the multi-user UUIDs, decrypts the VLESS protocol, and routes it to the internet via Cloudflare WARP.
+3. **The VPS Exit Node (Xray-core)**: Receives the WSS traffic, authenticates the multi-user UUIDs, decrypts the VLESS protocol, and routes it to the internet via WireProxy (WARP).
 
 ---
 
@@ -51,7 +51,7 @@ bash <(curl -fsSL https://raw.githubusercontent.com/ramin-mahmoodi/IranTUN/main/
 
 ### What the installer does:
 1. Prompts you to set an **Admin Secret** (for Web Panel access) to ensure your web UI remains strictly private.
-2. Prompts you to enable/disable **Adaptive Upload** and **Cloudflare WARP**.
+2. Prompts you to enable/disable **Adaptive Upload** and **WireProxy (WARP)**.
 3. Compiles a customized Node.js package and uploads it directly to your cPanel host via FTP.
 4. Installs Xray-core and configures the Multi-User framework on the VPS.
 5. Installs the `irantun` CLI menu for easy VPS management.
