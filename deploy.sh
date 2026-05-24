@@ -206,22 +206,78 @@ XRAY_CONF
     fi
 
     if [ "$WARP_ENABLE" = "true" ]; then
-        echo -e "\n${BLUE}Installing Cloudflare WARP (SOCKS5 Proxy on 40000)...${NC}"
-        if [ -f /etc/debian_version ]; then
-            apt-get update -y && apt-get install -y gnupg lsb-release curl
-            curl -fsSL https://pkg.cloudflareclient.com/pubkey.gpg | gpg --yes --dearmor --output /usr/share/keyrings/cloudflare-warp-archive-keyring.gpg
-            echo "deb [arch=amd64 signed-by=/usr/share/keyrings/cloudflare-warp-archive-keyring.gpg] https://pkg.cloudflareclient.com/ $(lsb_release -cs) main" | tee /etc/apt/sources.list.d/cloudflare-client.list
-            apt-get update -y && apt-get install -y cloudflare-warp
-            warp-cli --accept-tos registration new
-            warp-cli --accept-tos mode proxy
-            warp-cli --accept-tos proxy port 40000
-            warp-cli --accept-tos connect
+        echo -e "\n${BLUE}Installing WireProxy (Cloudflare WARP via SOCKS5 on 40000)...${NC}"
+        
+        # Download wgcf and wireproxy
+        curl -fsSL -o /usr/local/bin/wgcf https://github.com/ViRb3/wgcf/releases/download/v2.2.22/wgcf_2.2.22_linux_amd64
+        chmod +x /usr/local/bin/wgcf
+        
+        curl -fsSL -o /tmp/wireproxy.tar.gz https://github.com/pufferffish/wireproxy/releases/download/v1.0.7/wireproxy_linux_amd64.tar.gz
+        tar -xzf /tmp/wireproxy.tar.gz -C /tmp
+        mv /tmp/wireproxy /usr/local/bin/
+        chmod +x /usr/local/bin/wireproxy
+        rm -f /tmp/wireproxy.tar.gz
+        
+        mkdir -p /usr/local/etc/wireproxy
+        cd /usr/local/etc/wireproxy
+        
+        # Generate WARP config
+        echo -e "Registering free WARP account (this may take a moment)..."
+        yes | /usr/local/bin/wgcf register --accept-tos >/dev/null 2>&1
+        /usr/local/bin/wgcf generate >/dev/null 2>&1
+        
+        if [ -f wgcf-profile.conf ]; then
+            PRIV_KEY=$(grep '^PrivateKey' wgcf-profile.conf | cut -d '=' -f 2 | tr -d ' ')
+            PUB_KEY=$(grep '^PublicKey' wgcf-profile.conf | cut -d '=' -f 2 | tr -d ' ')
+            ENDPOINT=$(grep '^Endpoint' wgcf-profile.conf | cut -d '=' -f 2 | tr -d ' ')
+            ADDRESS=$(grep '^Address' wgcf-profile.conf | head -n 1 | cut -d '=' -f 2 | tr -d ' ')
+            
+            cat <<EOF > wireproxy.conf
+[Interface]
+Address = $ADDRESS
+PrivateKey = $PRIV_KEY
+MTU = 1280
+DNS = 1.1.1.1
+
+[Peer]
+PublicKey = $PUB_KEY
+Endpoint = $ENDPOINT
+
+[Socks5]
+BindAddress = 127.0.0.1:40000
+EOF
+            
+            cat <<EOF > /etc/systemd/system/wireproxy.service
+[Unit]
+Description=WireProxy for WARP
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+ExecStart=/usr/local/bin/wireproxy -c /usr/local/etc/wireproxy/wireproxy.conf
+Restart=always
+RestartSec=5
+User=root
+LimitNOFILE=65535
+
+[Install]
+WantedBy=multi-user.target
+EOF
+            
+            systemctl daemon-reload
+            systemctl enable wireproxy
+            systemctl start wireproxy
+            
             sleep 2
-            echo -e "${GREEN}✓ WARP proxy running on 127.0.0.1:40000${NC}"
+            if systemctl is-active --quiet wireproxy; then
+                echo -e "${GREEN}✓ WireProxy running successfully on 127.0.0.1:40000${NC}"
+            else
+                echo -e "${RED}⚠ WireProxy failed to start.${NC}"
+            fi
         else
-            echo -e "${RED}✗ WARP automatic installation is only supported on Debian/Ubuntu.${NC}"
-            echo -e "You might need to manually configure a SOCKS proxy on port 40000."
+            echo -e "${RED}⚠ Failed to generate WARP profile (Cloudflare API block?). SOCKS5 won't work.${NC}"
         fi
+        cd - >/dev/null
     fi
 
     echo -e "\n${BLUE}Installing CLI Management Menu...${NC}"

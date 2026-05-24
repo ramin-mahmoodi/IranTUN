@@ -213,16 +213,11 @@ system_status() {
         echo -e "Xray Core: ${RED}Inactive / Error${NC}"
     fi
     
-    # Check WARP
-    if command -v warp-cli >/dev/null 2>&1; then
-        WARP_STATUS=$(warp-cli --accept-tos status 2>/dev/null | grep 'Status' || echo "Unknown")
-        if [[ "$WARP_STATUS" == *"Connected"* ]]; then
-            echo -e "WARP Proxy: ${GREEN}Connected (Port 40000)${NC}"
-        else
-            echo -e "WARP Proxy: ${RED}Disconnected ($WARP_STATUS)${NC}"
-        fi
+    # Check WARP (WireProxy)
+    if systemctl is-active --quiet wireproxy; then
+        echo -e "WARP Proxy: ${GREEN}Connected (WireProxy on Port 40000)${NC}"
     else
-        echo -e "WARP Proxy: ${YELLOW}Not Installed${NC}"
+        echo -e "WARP Proxy: ${RED}Disconnected / Not Installed${NC}"
     fi
     
     read -p "Press Enter to return to menu..."
@@ -232,11 +227,9 @@ restart_services() {
     echo -e "\n${BLUE}Restarting services...${NC}"
     systemctl restart xray
     echo -e "${GREEN}✓ Xray restarted${NC}"
-    if command -v warp-cli >/dev/null 2>&1; then
-        warp-cli --accept-tos disconnect
-        sleep 1
-        warp-cli --accept-tos connect
-        echo -e "${GREEN}✓ WARP reconnected${NC}"
+    if systemctl list-unit-files | grep -q wireproxy.service; then
+        systemctl restart wireproxy
+        echo -e "${GREEN}✓ WireProxy (WARP) restarted${NC}"
     fi
     read -p "Press Enter to return to menu..."
 }
@@ -249,17 +242,20 @@ uninstall_irantun() {
         echo -e "Stopping services..."
         systemctl stop xray
         systemctl disable xray
-        if command -v warp-cli >/dev/null 2>&1; then
-            warp-cli --accept-tos disconnect
+        if systemctl list-unit-files | grep -q wireproxy.service; then
+            systemctl stop wireproxy
+            systemctl disable wireproxy
         fi
         
         echo -e "Removing Xray..."
         bash -c "$(curl -L https://github.com/XTLS/Xray-install/raw/main/install-release.sh)" @ remove
         
-        echo -e "Removing Cloudflare WARP..."
-        if command -v apt-get >/dev/null 2>&1; then
-            apt-get remove --purge -y cloudflare-warp
-        fi
+        echo -e "Removing WireProxy..."
+        rm -f /usr/local/bin/wireproxy
+        rm -f /usr/local/bin/wgcf
+        rm -rf /usr/local/etc/wireproxy
+        rm -f /etc/systemd/system/wireproxy.service
+        systemctl daemon-reload
         
         echo -e "Cleaning up files..."
         rm -rf /usr/local/etc/xray
