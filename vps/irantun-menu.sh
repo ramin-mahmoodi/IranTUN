@@ -33,6 +33,11 @@ fi
 DOMAIN=$(jq -r '.inbounds[0].settings.clients[0].email' $XRAY_CONF | cut -d'@' -f2)
 PORT=$(jq -r '.inbounds[0].port' $XRAY_CONF)
 TLS_SETTING=$(jq -r '.inbounds[0].streamSettings.security' $XRAY_CONF)
+DOMAINS_FILE="/usr/local/etc/xray/domains.txt"
+
+if [ ! -f "$DOMAINS_FILE" ]; then
+    echo "$DOMAIN" > "$DOMAINS_FILE"
+fi
 
 generate_vless_link() {
     local uuid=$1
@@ -65,7 +70,9 @@ list_users() {
             
             echo -e "${YELLOW}[User $((i+1))] Name:${NC} $client_name"
             echo -e "${CYAN}UUID:${NC} $client_uuid"
-            generate_vless_link "$client_uuid" "$client_email" "$DOMAIN" "$TLS_SETTING"
+            while IFS= read -r d || [ -n "$d" ]; do
+                generate_vless_link "$client_uuid" "$client_email" "$d" "$TLS_SETTING"
+            done < "$DOMAINS_FILE"
             echo -e "------------------------------------------------------------"
         done
     fi
@@ -112,8 +119,10 @@ add_user() {
         rm -f $TMP_CONF
         systemctl restart xray
         echo -e "${GREEN}✓ User '$NEW_USER' added successfully!${NC}"
-        echo -e "\n${GREEN}⚡ Connection Link:${NC}"
-        generate_vless_link "$NEW_UUID" "$NEW_EMAIL" "$DOMAIN" "$TLS_SETTING"
+        echo -e "\n${GREEN}⚡ Connection Links:${NC}"
+        while IFS= read -r d || [ -n "$d" ]; do
+            generate_vless_link "$NEW_UUID" "$NEW_EMAIL" "$d" "$TLS_SETTING"
+        done < "$DOMAINS_FILE"
     else
         echo -e "${RED}Error adding user.${NC}"
         rm -f $TMP_CONF
@@ -264,6 +273,63 @@ uninstall_irantun() {
     fi
 }
 
+manage_domains() {
+    while true; do
+        clear
+        echo -e "${BLUE}============================================================${NC}"
+        echo -e "${GREEN}      cPanel Host Domains Management      ${NC}"
+        echo -e "${BLUE}============================================================${NC}"
+        echo "Active Domains for Link Generation:"
+        local idx=1
+        while IFS= read -r d || [ -n "$d" ]; do
+            if [ -n "$d" ]; then
+                echo -e "  [$idx] $d"
+                ((idx++))
+            fi
+        done < "$DOMAINS_FILE"
+        echo -e "------------------------------------------------------------"
+        echo -e " [1] Add New Domain"
+        echo -e " [2] Remove Domain"
+        echo -e " [0] Back to Main Menu"
+        read -p "Select an option: " DOM_OPT
+        
+        case $DOM_OPT in
+            1)
+                read -p "Enter new domain (e.g. host2.com): " NEW_DOM
+                if [ -n "$NEW_DOM" ]; then
+                    # basic validation
+                    NEW_DOM=$(echo "$NEW_DOM" | tr -d ' ' | tr '[:upper:]' '[:lower:]')
+                    if grep -q "^${NEW_DOM}$" "$DOMAINS_FILE"; then
+                        echo -e "${RED}Domain already exists!${NC}"
+                    else
+                        echo "$NEW_DOM" >> "$DOMAINS_FILE"
+                        echo -e "${GREEN}Domain added.${NC}"
+                    fi
+                fi
+                sleep 1
+                ;;
+            2)
+                read -p "Enter the number of the domain to remove: " DEL_DOM_IDX
+                if [[ "$DEL_DOM_IDX" =~ ^[0-9]+$ ]] && [ "$DEL_DOM_IDX" -ge 1 ] && [ "$DEL_DOM_IDX" -lt "$idx" ]; then
+                    local target_dom=$(sed -n "${DEL_DOM_IDX}p" "$DOMAINS_FILE")
+                    # Make sure we don't delete the last domain
+                    if [ "$idx" -le 2 ]; then
+                        echo -e "${RED}Cannot remove the last domain. Please add another one first.${NC}"
+                    else
+                        sed -i "${DEL_DOM_IDX}d" "$DOMAINS_FILE"
+                        echo -e "${GREEN}Domain '$target_dom' removed.${NC}"
+                    fi
+                else
+                    echo -e "${RED}Invalid selection.${NC}"
+                fi
+                sleep 1
+                ;;
+            0) break ;;
+            *) echo -e "${RED}Invalid option.${NC}"; sleep 1 ;;
+        esac
+    done
+}
+
 # Main Menu Loop
 while true; do
     clear
@@ -282,9 +348,10 @@ while true; do
     echo -e " [5] System Status"
     echo -e " [6] Restart Services"
     echo -e " [7] Uninstall IranTUN"
+    echo -e " [8] Manage cPanel Domains (Multi-Host)"
     echo -e " [0] Exit"
     echo -e "${BLUE}============================================================${NC}"
-    read -p "Select an option [0-7]: " OPTION
+    read -p "Select an option [0-8]: " OPTION
 
     case $OPTION in
         1) list_users ;;
@@ -294,6 +361,7 @@ while true; do
         5) system_status ;;
         6) restart_services ;;
         7) uninstall_irantun ;;
+        8) manage_domains ;;
         0) exit 0 ;;
         *) echo -e "${RED}Invalid option.${NC}"; sleep 1 ;;
     esac
