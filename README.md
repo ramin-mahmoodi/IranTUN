@@ -70,9 +70,11 @@ root@vps:~# irantun
 - `[1] View All Users`: Displays a list of all active users and their full VLESS connection links across all your saved domains.
 - `[2] Add New User`: Generates a new UUID for a user, adds it to the Xray config, and prints the VLESS links for all your domains.
 - `[3] Remove User`: Allows you to safely delete a user's access.
-- `[4] Change VPS Listen Port`: Quickly change the internal Xray port.
-- `[5] System Status`: Check if Xray and WARP proxies are running correctly.
-- `[8] Manage cPanel Domains`: Add or remove domains to instantly generate multi-host VLESS links for all your users.
+- `[4] Manage cPanel Domains`: Add or remove domains to instantly generate multi-host VLESS links for all your users.
+- `[5] Change VPS Listen Port`: Quickly change the internal Xray port.
+- `[6] System Status`: Check if Xray and WARP proxies are running correctly.
+- `[7] Restart Services`: Restarts Xray and WARP.
+- `[8] Uninstall IranTUN`: Completely removes the tunnel from the VPS.
 
 ---
 
