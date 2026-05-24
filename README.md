@@ -21,6 +21,7 @@ This project completely eliminates the need for expensive domestic intermediary 
 ## Key Features
 
 * **Serverless Architecture**: Your clients connect directly to your Iranian cPanel host, which securely bridges traffic to your Foreign VPS (Exit Node). No domestic VPS needed!
+* **Multi-Domain Management**: Deploy the Node.js bridge across multiple cPanel hosts and manage all your domains from a single CLI menu to generate load-balanced VLESS links!
 * **Multi-User Management CLI**: Easily create, manage, and delete multiple users directly from the Linux VPS terminal using the built-in `irantun` command.
 * **Cloudflare WARP Integration**: Automatically routes outgoing traffic from your VPS through Cloudflare WARP (SOCKS5), hiding your real VPS IP from target sites and preventing blocks from services like Netflix or ChatGPT.
 * **Adaptive Upload (Batching)**: A smart buffering algorithm designed specifically for cPanel limits. It queues small packets and flushes them in bursts, exponentially increasing upload speeds on congested networks while keeping CPU usage at **0.00%**.
@@ -66,11 +67,12 @@ root@vps:~# irantun
 ```
 
 **Features available in the menu:**
-- `[1] View All Users`: Displays a list of all active users and their full VLESS connection links.
-- `[2] Add New User`: Generates a new UUID for a user, adds it to the Xray config, and prints the VLESS link.
+- `[1] View All Users`: Displays a list of all active users and their full VLESS connection links across all your saved domains.
+- `[2] Add New User`: Generates a new UUID for a user, adds it to the Xray config, and prints the VLESS links for all your domains.
 - `[3] Remove User`: Allows you to safely delete a user's access.
 - `[4] Change VPS Listen Port`: Quickly change the internal Xray port.
 - `[5] System Status`: Check if Xray and WARP proxies are running correctly.
+- `[8] Manage cPanel Domains`: Add or remove domains to instantly generate multi-host VLESS links for all your users.
 
 ---
 
