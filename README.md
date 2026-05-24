@@ -18,19 +18,19 @@
 
 This project completely eliminates the need for expensive domestic intermediary servers by turning your cheap Iranian shared host into a secure, camouflaged forward-proxy bridge.
 
-## ✨ Key Features
+## 🌟 Key Features
 
 * 🚀 **Serverless Architecture**: Your clients connect directly to your Iranian cPanel host, which securely bridges traffic to your Foreign VPS (Exit Node). No domestic VPS needed!
 * 👥 **Multi-User Management CLI**: Easily create, manage, and delete multiple users directly from the Linux VPS terminal using the built-in `irantun` command.
-* 🛡️ **Cloudflare WARP Integration**: Automatically routes outgoing traffic from your VPS through Cloudflare WARP (SOCKS5), hiding your real VPS IP from target sites and preventing blocks from services like Netflix or ChatGPT.
+* 🔒 **Cloudflare WARP Integration**: Automatically routes outgoing traffic from your VPS through Cloudflare WARP (SOCKS5), hiding your real VPS IP from target sites and preventing blocks from services like Netflix or ChatGPT.
 * ⚡ **Adaptive Upload (Batching)**: A smart buffering algorithm designed specifically for cPanel limits. It queues small packets and flushes them in bursts, exponentially increasing upload speeds on congested networks while keeping CPU usage at **0.00%**.
-* 🎭 **100% Camouflage Portfolio**: Serves a beautiful, interactive tech-startup landing page at your root domain (`https://yourdomain.com/`) to easily pass hosting manual reviews.
-* 🔐 **Anti-DPI Secure WebSocket (WSS)**: Wraps VLESS-WS traffic in TLS using automatically generated self-signed SSL certificates, encrypting headers at the transport layer to bypass Deep Packet Inspection (DPI).
-* ⚙️ **Dynamic Web Admin Panel**: A hidden dashboard (`https://yourdomain.com/?secret=ADMIN_SECRET`) offering real-time diagnostics, active connections, live logs, and a built-in **VLESS Link Generator**.
+* 🎨 **100% Camouflage Portfolio**: Serves a beautiful, interactive tech-startup landing page at your root domain (`https://yourdomain.com/`) to easily pass hosting manual reviews.
+* 🔑 **Anti-DPI Secure WebSocket (WSS)**: Wraps VLESS-WS traffic in TLS using automatically generated self-signed SSL certificates, encrypting headers at the transport layer to bypass Deep Packet Inspection (DPI).
+* 🔧 **Dynamic Web Admin Panel**: A hidden dashboard (`https://yourdomain.com/?secret=ADMIN_SECRET`) offering real-time diagnostics, active connections, live logs, and a built-in **VLESS Link Generator**.
 
 ---
 
-## 🏗️ How it Works (Architecture)
+## 🌐 How it Works (Architecture)
 
 IranTUN operates on a **Forward-Proxy** model with strict separation of concerns to guarantee security and performance.
 
@@ -40,7 +40,7 @@ IranTUN operates on a **Forward-Proxy** model with strict separation of concerns
 
 ---
 
-## 🛠️ Interactive One-Click Installation
+## 💻 Interactive One-Click Installation
 
 To deploy the entire system (both the Foreign VPS and your Iran cPanel Host), run the interactive Bash installer directly on your **Foreign VPS** as `root`:
 
@@ -74,7 +74,7 @@ root@vps:~# irantun
 
 ---
 
-## 🎛️ Secret Web Admin Panel
+## 📊 Secret Web Admin Panel
 
 Your cPanel host comes with a hidden dashboard. Access it by visiting:
 `https://yourdomain.com/?secret=YOUR_ADMIN_SECRET`
@@ -87,5 +87,5 @@ Your cPanel host comes with a hidden dashboard. Access it by visiting:
 
 ---
 
-## 🛡️ License & Disclaimer
+## 🔒 License & Disclaimer
 This project is open-source and intended for educational and network optimization purposes. Please respect the Terms of Service of your hosting provider.
