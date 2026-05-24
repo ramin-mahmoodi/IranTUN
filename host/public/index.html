@@ -357,9 +357,9 @@
         
         let link = "";
         if (window.location.protocol === 'https:') {
-          link = \`vless://\${uuid}@\${domain}:443?type=ws&security=tls&path=\${encodeURIComponent(tunnelPath)}&host=\${domain}#IranTUN_\${name}\`;
+          link = `vless://${uuid}@${domain}:443?type=ws&security=tls&path=${encodeURIComponent(tunnelPath)}&host=${domain}#IranTUN_${name}`;
         } else {
-          link = \`vless://\${uuid}@\${domain}:80?type=ws&security=none&path=\${encodeURIComponent(tunnelPath)}&host=\${domain}#IranTUN_\${name}_Unsecured\`;
+          link = `vless://${uuid}@${domain}:80?type=ws&security=none&path=${encodeURIComponent(tunnelPath)}&host=${domain}#IranTUN_${name}_Unsecured`;
         }
         
         document.getElementById('generated-link-output').value = link;
