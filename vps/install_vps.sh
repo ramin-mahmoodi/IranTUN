@@ -71,6 +71,15 @@ else
   ADAPTIVE_DELAY="15"
 fi
 
+echo -e "\nDo you want to install Cloudflare WARP (SOCKS5 Proxy) to hide the VPS IP and bypass geo-blocks?"
+echo "Note: This routes outgoing traffic through WARP."
+read -p "Install WARP? (y/n) [y]: " WARP_CHOICE
+if [[ "$WARP_CHOICE" =~ ^[Yy]$ ]] || [ -z "$WARP_CHOICE" ]; then
+  WARP_ENABLE="true"
+else
+  WARP_ENABLE="false"
+fi
+
 echo -e "\n${BLUE}Using UUID: ${GREEN}$USER_UUID${NC}"
 echo -e "${BLUE}Using Domain: ${GREEN}$BRIDGE_DOMAIN${NC}"
 echo -e "${BLUE}Using Protocol: ${GREEN}$VPS_PROTOCOL${NC} on port ${GREEN}$VPS_PORT${NC}"
@@ -150,6 +159,10 @@ cat << EOF > "$CONFIG_DIR/config.json"
 }
 EOF
 
+if [ "$WARP_ENABLE" = "true" ]; then
+  sed -i 's/"outbounds": \[/"outbounds": \[ { "protocol": "socks", "settings": { "servers": [ { "address": "127.0.0.1", "port": 40000 } ] }, "tag": "warp" },/g' "$CONFIG_DIR/config.json"
+fi
+
 echo -e "${GREEN}✓ VLESS-WS config injected into $CONFIG_DIR/config.json${NC}"
 
 echo -e "${BLUE}[3/4] Starting and enabling Xray systemd daemon...${NC}"
@@ -165,7 +178,25 @@ else
   exit 1
 fi
 
-echo -e "${BLUE}[5/6] Installing CLI Management Menu...${NC}"
+if [ "$WARP_ENABLE" = "true" ]; then
+  echo -e "\n${BLUE}[4.5/6] Installing Cloudflare WARP (SOCKS5 Proxy on 40000)...${NC}"
+  if [ -f /etc/debian_version ]; then
+      apt-get update -y && apt-get install -y gnupg lsb-release curl
+      curl -fsSL https://pkg.cloudflareclient.com/pubkey.gpg | gpg --yes --dearmor --output /usr/share/keyrings/cloudflare-warp-archive-keyring.gpg
+      echo "deb [arch=amd64 signed-by=/usr/share/keyrings/cloudflare-warp-archive-keyring.gpg] https://pkg.cloudflareclient.com/ $(lsb_release -cs) main" | tee /etc/apt/sources.list.d/cloudflare-client.list
+      apt-get update -y && apt-get install -y cloudflare-warp
+      warp-cli --accept-tos registration new
+      warp-cli --accept-tos mode proxy
+      warp-cli --accept-tos proxy port 40000
+      warp-cli --accept-tos connect
+      sleep 2
+      echo -e "${GREEN}✓ WARP proxy running on 127.0.0.1:40000${NC}"
+  else
+      echo -e "${RED}✗ WARP automatic installation is only supported on Debian/Ubuntu.${NC}"
+  fi
+fi
+
+echo -e "\n${BLUE}[5/6] Installing CLI Management Menu...${NC}"
 GITHUB_RAW="https://raw.githubusercontent.com/ramin-mahmoodi/IranTUN/main"
 curl -s -L "$GITHUB_RAW/vps/irantun-menu.sh" -o /usr/local/bin/irantun
 chmod +x /usr/local/bin/irantun

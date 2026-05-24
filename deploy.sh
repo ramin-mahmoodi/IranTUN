@@ -106,6 +106,15 @@ main() {
         ADAPTIVE_DELAY="15"
     fi
 
+    echo -e "\nDo you want to install Cloudflare WARP (SOCKS5 Proxy) to hide the VPS IP and bypass geo-blocks?"
+    echo "Note: This routes outgoing traffic through WARP."
+    WARP_CHOICE=$(prompt_input "Install WARP? (y/n)" "y")
+    if [[ "$WARP_CHOICE" =~ ^[Yy]$ ]]; then
+        WARP_ENABLE="true"
+    else
+        WARP_ENABLE="false"
+    fi
+
     echo -e "\n${YELLOW}--- Part 2: cPanel FTP Configurations ---${NC}"
     BRIDGE_DOMAIN=$(prompt_input "Enter your cPanel Domain (e.g. yourdomain.com)")
     FTP_HOST=$(prompt_input "Enter cPanel FTP Host" "ftp.$BRIDGE_DOMAIN")
@@ -153,15 +162,6 @@ main() {
     }
   ],
   "outbounds": [
-    {
-      "protocol": "socks",
-      "settings": {
-        "servers": [
-          { "address": "127.0.0.1", "port": 40000 }
-        ]
-      },
-      "tag": "warp"
-    },
     { "protocol": "freedom", "settings": {}, "tag": "direct" },
     { "protocol": "blackhole", "settings": {}, "tag": "blocked" }
   ],
@@ -172,6 +172,10 @@ main() {
   }
 }
 XRAY_CONF
+
+    if [ "$WARP_ENABLE" = "true" ]; then
+      sed -i 's/"outbounds": \[/"outbounds": \[ { "protocol": "socks", "settings": { "servers": [ { "address": "127.0.0.1", "port": 40000 } ] }, "tag": "warp" },/g' /usr/local/etc/xray/config.json
+    fi
 
     echo "Restarting Xray daemon..."
     systemctl daemon-reload
@@ -185,21 +189,23 @@ XRAY_CONF
         echo -e "${RED}⚠ Warning: Xray service failed to start or state is unknown.${NC}"
     fi
 
-    echo -e "\n${BLUE}Installing Cloudflare WARP (SOCKS5 Proxy on 40000)...${NC}"
-    if [ -f /etc/debian_version ]; then
-        apt-get update -y && apt-get install -y gnupg lsb-release curl
-        curl -fsSL https://pkg.cloudflareclient.com/pubkey.gpg | gpg --yes --dearmor --output /usr/share/keyrings/cloudflare-warp-archive-keyring.gpg
-        echo "deb [arch=amd64 signed-by=/usr/share/keyrings/cloudflare-warp-archive-keyring.gpg] https://pkg.cloudflareclient.com/ $(lsb_release -cs) main" | tee /etc/apt/sources.list.d/cloudflare-client.list
-        apt-get update -y && apt-get install -y cloudflare-warp
-        warp-cli --accept-tos registration new
-        warp-cli --accept-tos mode proxy
-        warp-cli --accept-tos proxy port 40000
-        warp-cli --accept-tos connect
-        sleep 2
-        echo -e "${GREEN}✓ WARP proxy running on 127.0.0.1:40000${NC}"
-    else
-        echo -e "${RED}✗ WARP automatic installation is only supported on Debian/Ubuntu.${NC}"
-        echo -e "You might need to manually configure a SOCKS proxy on port 40000."
+    if [ "$WARP_ENABLE" = "true" ]; then
+        echo -e "\n${BLUE}Installing Cloudflare WARP (SOCKS5 Proxy on 40000)...${NC}"
+        if [ -f /etc/debian_version ]; then
+            apt-get update -y && apt-get install -y gnupg lsb-release curl
+            curl -fsSL https://pkg.cloudflareclient.com/pubkey.gpg | gpg --yes --dearmor --output /usr/share/keyrings/cloudflare-warp-archive-keyring.gpg
+            echo "deb [arch=amd64 signed-by=/usr/share/keyrings/cloudflare-warp-archive-keyring.gpg] https://pkg.cloudflareclient.com/ $(lsb_release -cs) main" | tee /etc/apt/sources.list.d/cloudflare-client.list
+            apt-get update -y && apt-get install -y cloudflare-warp
+            warp-cli --accept-tos registration new
+            warp-cli --accept-tos mode proxy
+            warp-cli --accept-tos proxy port 40000
+            warp-cli --accept-tos connect
+            sleep 2
+            echo -e "${GREEN}✓ WARP proxy running on 127.0.0.1:40000${NC}"
+        else
+            echo -e "${RED}✗ WARP automatic installation is only supported on Debian/Ubuntu.${NC}"
+            echo -e "You might need to manually configure a SOCKS proxy on port 40000."
+        fi
     fi
 
     echo -e "\n${BLUE}Installing CLI Management Menu...${NC}"
