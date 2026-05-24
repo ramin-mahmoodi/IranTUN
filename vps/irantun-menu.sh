@@ -108,7 +108,8 @@ add_user() {
     jq ".inbounds[0].settings.clients += [{\"id\": \"$NEW_UUID\", \"level\": 0, \"email\": \"$NEW_EMAIL\"}]" $XRAY_CONF > $TMP_CONF
     
     if [ $? -eq 0 ]; then
-        mv $TMP_CONF $XRAY_CONF
+        cat $TMP_CONF > $XRAY_CONF
+        rm -f $TMP_CONF
         systemctl restart xray
         echo -e "${GREEN}✓ User '$NEW_USER' added successfully!${NC}"
         echo -e "\n${GREEN}⚡ Connection Link:${NC}"
@@ -152,7 +153,8 @@ remove_user() {
             local TMP_CONF=$(mktemp)
             jq "del(.inbounds[0].settings.clients[$DEL_IDX])" $XRAY_CONF > $TMP_CONF
             if [ $? -eq 0 ]; then
-                mv $TMP_CONF $XRAY_CONF
+                cat $TMP_CONF > $XRAY_CONF
+                rm -f $TMP_CONF
                 systemctl restart xray
                 echo -e "${GREEN}✓ User '$target_name' deleted successfully.${NC}"
             else
@@ -177,7 +179,8 @@ change_port() {
         local TMP_CONF=$(mktemp)
         jq ".inbounds[0].port = $NEW_PORT" $XRAY_CONF > $TMP_CONF
         if [ $? -eq 0 ]; then
-            mv $TMP_CONF $XRAY_CONF
+            cat $TMP_CONF > $XRAY_CONF
+            rm -f $TMP_CONF
             systemctl restart xray
             echo -e "${GREEN}✓ Port changed successfully to: $NEW_PORT${NC}"
             echo -e "${RED}⚠️ IMPORTANT: Remember to update the 'VPS Port' setting in your cPanel Web Admin Panel!${NC}"
