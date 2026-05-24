@@ -344,11 +344,11 @@ while true; do
     echo -e " [1] View All Users & VLESS Links"
     echo -e " [2] Add New User"
     echo -e " [3] Remove User"
-    echo -e " [4] Change VPS Listen Port"
-    echo -e " [5] System Status"
-    echo -e " [6] Restart Services"
-    echo -e " [7] Uninstall IranTUN"
-    echo -e " [8] Manage cPanel Domains (Multi-Host)"
+    echo -e " [4] Manage cPanel Domains (Multi-Host)"
+    echo -e " [5] Change VPS Listen Port"
+    echo -e " [6] System Status"
+    echo -e " [7] Restart Services"
+    echo -e " [8] Uninstall IranTUN"
     echo -e " [0] Exit"
     echo -e "${BLUE}============================================================${NC}"
     read -p "Select an option [0-8]: " OPTION
@@ -357,11 +357,11 @@ while true; do
         1) list_users ;;
         2) add_user ;;
         3) remove_user ;;
-        4) change_port ;;
-        5) system_status ;;
-        6) restart_services ;;
-        7) uninstall_irantun ;;
-        8) manage_domains ;;
+        4) manage_domains ;;
+        5) change_port ;;
+        6) system_status ;;
+        7) restart_services ;;
+        8) uninstall_irantun ;;
         0) exit 0 ;;
         *) echo -e "${RED}Invalid option.${NC}"; sleep 1 ;;
     esac
