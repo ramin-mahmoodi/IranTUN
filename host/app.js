@@ -12,7 +12,9 @@ let config = {
   vpsPath: "/metrics",
   tunnelPath: "/api/v1/analytics",
   secretUuid: "YOUR_UUID_HERE",
-  port: 3000
+  port: 3000,
+  adaptiveUpload: false,
+  adaptiveDelayMs: 15
 };
 
 if (fs.existsSync(configPath)) {
@@ -72,6 +74,8 @@ const server = http.createServer((req, res) => {
             config.vpsPort = parseInt(newConfig.vpsPort);
             config.vpsProtocol = newConfig.vpsProtocol || 'ws';
             config.vpsPath = newConfig.vpsPath || '/metrics';
+            config.adaptiveUpload = newConfig.adaptiveUpload === true || newConfig.adaptiveUpload === "true";
+            config.adaptiveDelayMs = parseInt(newConfig.adaptiveDelayMs) || 15;
             
             fs.writeFileSync(configPath, JSON.stringify(config, null, 2));
             logEvent("SYSTEM", `Configuration updated via Web Console. New target: ${config.vpsProtocol}://${config.vpsIp}:${config.vpsPort}${config.vpsPath}`);
@@ -98,6 +102,8 @@ const server = http.createServer((req, res) => {
         vpsPort: config.vpsPort,
         vpsProtocol: config.vpsProtocol || "ws",
         vpsPath: config.vpsPath || "/metrics",
+        adaptiveUpload: config.adaptiveUpload || false,
+        adaptiveDelayMs: config.adaptiveDelayMs || 15,
         activeConnections,
         totalConnections,
         totalBytesTransferred,
@@ -200,6 +206,38 @@ wss.on('connection', (localWs, req) => {
   const bufferQueue = [];
   let isRemoteOpen = false;
 
+  // --- Adaptive Upload (Batching) Variables ---
+  let uploadQueue = [];
+  let uploadTimer = null;
+  const MAX_BATCH_BYTES = 16384; // 16 KB max batch size before forced flush
+  let currentBatchBytes = 0;
+
+  const flushUploadQueue = () => {
+    if (uploadTimer) {
+      clearTimeout(uploadTimer);
+      uploadTimer = null;
+    }
+    if (uploadQueue.length === 0 || !isRemoteOpen || remoteWs.readyState !== WebSocket.OPEN) return;
+
+    if (uploadQueue.length === 1) {
+      remoteWs.send(uploadQueue[0].message, { binary: uploadQueue[0].isBinary });
+    } else {
+      const allBinary = uploadQueue.every(item => item.isBinary && Buffer.isBuffer(item.message));
+      if (allBinary) {
+        const concatenated = Buffer.concat(uploadQueue.map(item => item.message));
+        remoteWs.send(concatenated, { binary: true });
+      } else {
+        uploadQueue.forEach(item => {
+          remoteWs.send(item.message, { binary: item.isBinary });
+        });
+      }
+    }
+    
+    uploadQueue = [];
+    currentBatchBytes = 0;
+  };
+  // ---------------------------------------------
+
   let idleTimeout;
   const refreshTimeout = () => {
     clearTimeout(idleTimeout);
@@ -219,7 +257,18 @@ wss.on('connection', (localWs, req) => {
     totalBytesTransferred += bytes;
     
     if (isRemoteOpen && remoteWs.readyState === WebSocket.OPEN) {
-      remoteWs.send(message, { binary: isBinary });
+      if (config.adaptiveUpload) {
+        uploadQueue.push({ message, isBinary });
+        currentBatchBytes += bytes;
+
+        if (currentBatchBytes >= MAX_BATCH_BYTES) {
+          flushUploadQueue();
+        } else if (!uploadTimer) {
+          uploadTimer = setTimeout(flushUploadQueue, config.adaptiveDelayMs || 15);
+        }
+      } else {
+        remoteWs.send(message, { binary: isBinary });
+      }
     } else {
       bufferQueue.push({ message, isBinary });
     }

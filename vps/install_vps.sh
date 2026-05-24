@@ -56,9 +56,25 @@ else
         }'
 fi
 
-echo -e "${BLUE}Using UUID: ${GREEN}$USER_UUID${NC}"
+echo -e "\n${BLUE}--- Advanced Host Settings ---${NC}"
+echo "Do you want to enable Adaptive Upload (Batching) to increase upload speed and save cPanel CPU?"
+echo "Note: This adds a slight ping delay (e.g., 10-15ms) to game traffic."
+read -p "Enable Adaptive Upload? (y/n) [n]: " ADAPTIVE_CHOICE
+if [[ "$ADAPTIVE_CHOICE" =~ ^[Yy]$ ]]; then
+  ADAPTIVE_ENABLE="true"
+  read -p "Enter batching delay in milliseconds (e.g. 15): [15] " ADAPTIVE_DELAY
+  if [ -z "$ADAPTIVE_DELAY" ]; then
+    ADAPTIVE_DELAY="15"
+  fi
+else
+  ADAPTIVE_ENABLE="false"
+  ADAPTIVE_DELAY="15"
+fi
+
+echo -e "\n${BLUE}Using UUID: ${GREEN}$USER_UUID${NC}"
 echo -e "${BLUE}Using Domain: ${GREEN}$BRIDGE_DOMAIN${NC}"
 echo -e "${BLUE}Using Protocol: ${GREEN}$VPS_PROTOCOL${NC} on port ${GREEN}$VPS_PORT${NC}"
+echo -e "${BLUE}Adaptive Upload Recommended Settings: ${GREEN}Enabled: $ADAPTIVE_ENABLE, Delay: ${ADAPTIVE_DELAY}ms${NC}"
 
 echo -e "${BLUE}[1/4] Installing Xray-core officially...${NC}"
 bash -c "$(curl -L https://github.com/XTLS/Xray-install/raw/main/install-release.sh)" @ install
@@ -161,7 +177,14 @@ echo -e "${GREEN}VLESS URI (Import directly into Nekobox / V2rayNG):${NC}"
 echo -e "vless://$USER_UUID@$BRIDGE_DOMAIN:443?type=ws&security=tls&path=%2Fapi%2Fv1%2Fanalytics&host=$BRIDGE_DOMAIN#IranTUN_HighSpeed_VLESS"
 echo -e "${BLUE}-------------------------------------------------------------------------${NC}"
 echo -e ""
-echo -e "Or if you haven't activated SSL on your host yet, use the HTTP non-TLS version (port 80):"
-echo -e "vless://$USER_UUID@$BRIDGE_DOMAIN:80?type=ws&security=none&path=%2Fapi%2Fv1%2Fanalytics&host=$BRIDGE_DOMAIN#IranTUN_Unsecured_VLESS"
-echo -e ""
+echo -e "${BLUE}*** IMPORTANT: Web Panel Configuration ***${NC}"
+echo -e "Because IranTUN is a Forward-Bridge, the Adaptive Upload settings must be configured on your cPanel Host."
+echo -e "Go to your secret Admin Panel: https://$BRIDGE_DOMAIN/?secret=$USER_UUID"
+if [ "$ADAPTIVE_ENABLE" = "true" ]; then
+  echo -e "1. Set 'Adaptive Upload (Batching)' to: ${GREEN}On (Low CPU, High Speed)${NC}"
+  echo -e "2. Set 'Batching Delay' to: ${GREEN}${ADAPTIVE_DELAY}ms${NC}"
+else
+  echo -e "1. Set 'Adaptive Upload (Batching)' to: ${GREEN}Off (Zero Ping, High CPU)${NC}"
+fi
+echo -e "3. Click 'Save & Apply Settings'"
 echo -e "${BLUE}=========================================================================${NC}"

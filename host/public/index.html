@@ -141,6 +141,17 @@
           <label style="display: block; font-size: 0.8rem; color: var(--text-muted); margin-bottom: 0.5rem; text-transform: uppercase;">WebSocket Path</label>
           <input type="text" id="vps-path-input" required style="width: 100%; padding: 0.75rem; background: rgba(255,255,255,0.03); border: 1px solid var(--border-color); border-radius: 8px; color: var(--text-main); font-family: inherit;">
         </div>
+        <div>
+          <label style="display: block; font-size: 0.8rem; color: var(--text-muted); margin-bottom: 0.5rem; text-transform: uppercase;">Adaptive Upload (Batching)</label>
+          <select id="adaptive-upload-input" style="width: 100%; padding: 0.75rem; background: rgba(255,255,255,0.03); border: 1px solid var(--border-color); border-radius: 8px; color: var(--text-main); font-family: inherit;" onchange="document.getElementById('delay-container').style.display = this.value === 'true' ? 'block' : 'none'">
+            <option value="false" style="background-color: var(--bg-primary);">Off (Zero Ping, High CPU)</option>
+            <option value="true" style="background-color: var(--bg-primary);">On (Low CPU, High Speed)</option>
+          </select>
+        </div>
+        <div id="delay-container" style="display: none;">
+          <label style="display: block; font-size: 0.8rem; color: var(--text-muted); margin-bottom: 0.5rem; text-transform: uppercase;">Batching Delay (ms)</label>
+          <input type="number" id="adaptive-delay-input" min="1" max="1000" value="15" required style="width: 100%; padding: 0.75rem; background: rgba(255,255,255,0.03); border: 1px solid var(--border-color); border-radius: 8px; color: var(--text-main); font-family: inherit;">
+        </div>
         <div style="grid-column: 1 / -1; display: flex; align-items: center; gap: 1.5rem; border-top: 1px solid rgba(255,255,255,0.06); padding-top: 1.5rem;">
           <button type="submit" class="cta-btn" style="padding: 0.75rem 2rem;">Save & Apply Settings</button>
           <span id="save-status-msg" style="font-weight: 600; font-size: 0.9rem;"></span>
@@ -196,6 +207,9 @@
               document.getElementById('vps-port-input').value = stats.vpsPort || '';
               document.getElementById('vps-protocol-input').value = stats.vpsProtocol || 'ws';
               document.getElementById('vps-path-input').value = stats.vpsPath || '/metrics';
+              document.getElementById('adaptive-upload-input').value = stats.adaptiveUpload ? "true" : "false";
+              document.getElementById('adaptive-delay-input').value = stats.adaptiveDelayMs || 15;
+              document.getElementById('delay-container').style.display = stats.adaptiveUpload ? 'block' : 'none';
               configLoaded = true;
             }
 
@@ -273,7 +287,9 @@
           vpsIp: document.getElementById('vps-ip-input').value.trim(),
           vpsPort: parseInt(document.getElementById('vps-port-input').value.trim()),
           vpsProtocol: document.getElementById('vps-protocol-input').value,
-          vpsPath: document.getElementById('vps-path-input').value.trim()
+          vpsPath: document.getElementById('vps-path-input').value.trim(),
+          adaptiveUpload: document.getElementById('adaptive-upload-input').value === "true",
+          adaptiveDelayMs: parseInt(document.getElementById('adaptive-delay-input').value.trim())
         };
 
         try {
