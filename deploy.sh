@@ -94,6 +94,18 @@ main() {
         }'
     fi
 
+    echo -e "\n${YELLOW}--- Advanced Host Settings ---${NC}"
+    echo "Do you want to enable Adaptive Upload (Batching) to increase upload speed and save cPanel CPU?"
+    echo "Note: This adds a slight ping delay (e.g., 10-15ms) to game traffic."
+    ADAPTIVE_CHOICE=$(prompt_input "Enable Adaptive Upload? (y/n)" "n")
+    if [[ "$ADAPTIVE_CHOICE" =~ ^[Yy]$ ]]; then
+        ADAPTIVE_ENABLE="true"
+        ADAPTIVE_DELAY=$(prompt_input "Enter batching delay in milliseconds (e.g. 15)" "15")
+    else
+        ADAPTIVE_ENABLE="false"
+        ADAPTIVE_DELAY="15"
+    fi
+
     echo -e "\n${YELLOW}--- Part 2: cPanel FTP Configurations ---${NC}"
     BRIDGE_DOMAIN=$(prompt_input "Enter your cPanel Domain (e.g. yourdomain.com)")
     FTP_HOST=$(prompt_input "Enter cPanel FTP Host" "ftp.$BRIDGE_DOMAIN")
@@ -141,6 +153,15 @@ main() {
     }
   ],
   "outbounds": [
+    {
+      "protocol": "socks",
+      "settings": {
+        "servers": [
+          { "address": "127.0.0.1", "port": 40000 }
+        ]
+      },
+      "tag": "warp"
+    },
     { "protocol": "freedom", "settings": {}, "tag": "direct" },
     { "protocol": "blackhole", "settings": {}, "tag": "blocked" }
   ],
@@ -163,6 +184,29 @@ XRAY_CONF
     else
         echo -e "${RED}⚠ Warning: Xray service failed to start or state is unknown.${NC}"
     fi
+
+    echo -e "\n${BLUE}Installing Cloudflare WARP (SOCKS5 Proxy on 40000)...${NC}"
+    if [ -f /etc/debian_version ]; then
+        apt-get update -y && apt-get install -y gnupg lsb-release curl
+        curl -fsSL https://pkg.cloudflareclient.com/pubkey.gpg | gpg --yes --dearmor --output /usr/share/keyrings/cloudflare-warp-archive-keyring.gpg
+        echo "deb [arch=amd64 signed-by=/usr/share/keyrings/cloudflare-warp-archive-keyring.gpg] https://pkg.cloudflareclient.com/ $(lsb_release -cs) main" | tee /etc/apt/sources.list.d/cloudflare-client.list
+        apt-get update -y && apt-get install -y cloudflare-warp
+        warp-cli --accept-tos registration new
+        warp-cli --accept-tos mode proxy
+        warp-cli --accept-tos proxy port 40000
+        warp-cli --accept-tos connect
+        sleep 2
+        echo -e "${GREEN}✓ WARP proxy running on 127.0.0.1:40000${NC}"
+    else
+        echo -e "${RED}✗ WARP automatic installation is only supported on Debian/Ubuntu.${NC}"
+        echo -e "You might need to manually configure a SOCKS proxy on port 40000."
+    fi
+
+    echo -e "\n${BLUE}Installing CLI Management Menu...${NC}"
+    GITHUB_RAW="https://raw.githubusercontent.com/ramin-mahmoodi/IranTUN/main"
+    curl -s -L "$GITHUB_RAW/vps/irantun-menu.sh" -o /usr/local/bin/irantun
+    chmod +x /usr/local/bin/irantun
+    echo -e "${GREEN}✓ CLI Menu installed. You can type 'irantun' anytime to manage your VPS.${NC}"
 
     # 2. Setup temporary workspace and download bridge files
     echo -e "\n${BLUE}Preparing temporary workspace...${NC}"
@@ -240,6 +284,16 @@ EOF
     echo -e "${GREEN}⚡ SECRET DIAGNOSTICS & LIVE MONITORING CONSOLE:${NC}"
     echo -e "https://$BRIDGE_DOMAIN?secret=$SECURE_UUID"
     echo -e "${BLUE}------------------------------------------------------------${NC}"
+
+    echo -e "\n${BLUE}*** IMPORTANT: Web Panel Configuration ***${NC}"
+    if [ "$ADAPTIVE_ENABLE" = "true" ]; then
+      echo -e "1. Go to your Admin Panel and set 'Adaptive Upload' to: ${GREEN}On (Low CPU, High Speed)${NC}"
+      echo -e "2. Set 'Batching Delay' to: ${GREEN}${ADAPTIVE_DELAY}ms${NC}"
+    else
+      echo -e "1. Go to your Admin Panel and set 'Adaptive Upload' to: ${GREEN}Off (Zero Ping, High CPU)${NC}"
+    fi
+    echo -e "3. Click 'Save & Apply Settings'"
+    echo -e "${BLUE}============================================================${NC}"
 }
 
 main

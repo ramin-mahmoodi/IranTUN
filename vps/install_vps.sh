@@ -165,7 +165,13 @@ else
   exit 1
 fi
 
-echo -e "${BLUE}[4/4] Generating ready-to-use Client Configurations...${NC}"
+echo -e "${BLUE}[5/6] Installing CLI Management Menu...${NC}"
+GITHUB_RAW="https://raw.githubusercontent.com/ramin-mahmoodi/IranTUN/main"
+curl -s -L "$GITHUB_RAW/vps/irantun-menu.sh" -o /usr/local/bin/irantun
+chmod +x /usr/local/bin/irantun
+echo -e "${GREEN}✓ CLI Menu installed. You can type 'irantun' anytime to manage your VPS.${NC}"
+
+echo -e "\n${BLUE}[6/6] Generating ready-to-use Client Configurations...${NC}"
 echo -e "${BLUE}=========================================================================${NC}"
 echo -e "${GREEN}IranTUN VPS is fully active!${NC}"
 echo -e ""
