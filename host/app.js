@@ -196,7 +196,11 @@ wss.on('connection', (localWs, req) => {
   const protocol = config.vpsProtocol || 'ws';
   const targetUrl = `${protocol}://${config.vpsIp}:${config.vpsPort}${config.vpsPath}`;
   const wsOptions = {
-    perMessageDeflate: false
+    perMessageDeflate: false,
+    headers: {
+      'User-Agent': req.headers['user-agent'] || 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+      'Origin': `https://${config.vpsIp}`
+    }
   };
   if (protocol === 'wss') {
     wsOptions.rejectUnauthorized = false; // Allow self-signed certificates
