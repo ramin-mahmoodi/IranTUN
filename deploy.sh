@@ -251,7 +251,9 @@ XRAY_CONF
   "vpsPath": "/metrics",
   "tunnelPath": "/api/v1/analytics",
   "secretUuid": "$ADMIN_SECRET",
-  "port": 3000
+  "port": 3000,
+  "adaptiveUpload": $ADAPTIVE_ENABLE,
+  "adaptiveDelayMs": $ADAPTIVE_DELAY
 }
 EOF
     echo -e "${GREEN}✓ config.json generated successfully.${NC}"
