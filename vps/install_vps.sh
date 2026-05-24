@@ -16,16 +16,24 @@ if [ "$EUID" -ne 0 ]; then
   exit 1
 fi
 
-# Generate or ask for configuration parameters
-read -p "Enter secure UUID (press Enter to auto-generate): " USER_UUID
-if [ -z "$USER_UUID" ]; then
+read -p "Enter secure UUID for Web Panel Admin Secret (press Enter to auto-generate): " ADMIN_SECRET
+if [ -z "$ADMIN_SECRET" ]; then
   if command -v uuidgen &> /dev/null; then
-    USER_UUID=$(uuidgen)
+    ADMIN_SECRET=$(uuidgen)
   elif [ -f /proc/sys/kernel/random/uuid ]; then
-    USER_UUID=$(cat /proc/sys/kernel/random/uuid)
+    ADMIN_SECRET=$(cat /proc/sys/kernel/random/uuid)
   else
-    USER_UUID="cc654e3d-71b5-4a6c-b3a2-a3962b8a07c1" # Fallback
+    ADMIN_SECRET="admin-secret-cc654e3d-71b5" # Fallback
   fi
+fi
+
+# Automatically generate a distinct UUID for the first VLESS user
+if command -v uuidgen &> /dev/null; then
+  USER_UUID=$(uuidgen)
+elif [ -f /proc/sys/kernel/random/uuid ]; then
+  USER_UUID=$(cat /proc/sys/kernel/random/uuid)
+else
+  USER_UUID="user-uuid-a3962b8a07c1" # Fallback
 fi
 
 read -p "Enter cPanel Bridge Domain (e.g. yourdomain.com): " BRIDGE_DOMAIN
@@ -80,12 +88,18 @@ else
   WARP_ENABLE="false"
 fi
 
-echo -e "\n${BLUE}Using UUID: ${GREEN}$USER_UUID${NC}"
+echo -e "\n${BLUE}Using Web Admin Secret: ${GREEN}$ADMIN_SECRET${NC}"
+echo -e "${BLUE}Using VLESS User UUID: ${GREEN}$USER_UUID${NC}"
 echo -e "${BLUE}Using Domain: ${GREEN}$BRIDGE_DOMAIN${NC}"
 echo -e "${BLUE}Using Protocol: ${GREEN}$VPS_PROTOCOL${NC} on port ${GREEN}$VPS_PORT${NC}"
 echo -e "${BLUE}Adaptive Upload Recommended Settings: ${GREEN}Enabled: $ADAPTIVE_ENABLE, Delay: ${ADAPTIVE_DELAY}ms${NC}"
 
-echo -e "${BLUE}[1/4] Installing Xray-core officially...${NC}"
+echo -e "${BLUE}[1/4] Installing required packages and Xray-core...${NC}"
+if [ -f /etc/debian_version ]; then
+    apt-get update -y && apt-get install -y jq curl
+elif [ -f /etc/redhat-release ]; then
+    yum install -y jq curl
+fi
 bash -c "$(curl -L https://github.com/XTLS/Xray-install/raw/main/install-release.sh)" @ install
 
 if [ $? -eq 0 ]; then
@@ -120,7 +134,7 @@ cat << EOF > "$CONFIG_DIR/config.json"
           {
             "id": "$USER_UUID",
             "level": 0,
-            "email": "love@$BRIDGE_DOMAIN"
+            "email": "Admin_User@$BRIDGE_DOMAIN"
           }
         ],
         "decryption": "none"
@@ -207,6 +221,8 @@ echo -e "${BLUE}================================================================
 echo -e "${GREEN}IranTUN VPS is fully active!${NC}"
 echo -e ""
 echo -e "You can now deploy the 'host' folder to your Iran Node.js Host."
+echo -e "IMPORTANT: When configuring host/config.json, use the ADMIN_SECRET for secretUuid."
+echo -e ""
 echo -e "Once the host is active, add this VLESS connection in V2rayNG, Nekobox, or Shadowrocket:"
 echo -e ""
 echo -e "${BLUE}-------------------------------------------------------------------------${NC}"
@@ -216,7 +232,7 @@ echo -e "${BLUE}----------------------------------------------------------------
 echo -e ""
 echo -e "${BLUE}*** IMPORTANT: Web Panel Configuration ***${NC}"
 echo -e "Because IranTUN is a Forward-Bridge, the Adaptive Upload settings must be configured on your cPanel Host."
-echo -e "Go to your secret Admin Panel: https://$BRIDGE_DOMAIN/?secret=$USER_UUID"
+echo -e "Go to your secret Admin Panel: https://$BRIDGE_DOMAIN/?secret=$ADMIN_SECRET"
 if [ "$ADAPTIVE_ENABLE" = "true" ]; then
   echo -e "1. Set 'Adaptive Upload (Batching)' to: ${GREEN}On (Low CPU, High Speed)${NC}"
   echo -e "2. Set 'Batching Delay' to: ${GREEN}${ADAPTIVE_DELAY}ms${NC}"

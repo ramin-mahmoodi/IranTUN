@@ -158,6 +158,30 @@
         </div>
       </form>
     </div>
+
+    <!-- VLESS Link Generator Panel -->
+    <div class="console-container" style="margin-top: 2rem;">
+      <div class="console-header">
+        <h2>Multi-User Link Generator</h2>
+        <p style="font-size: 0.85rem; color: var(--text-muted); margin-top: 0.5rem;">After adding a user on your VPS via the 'irantun' CLI, you can generate their VLESS link here.</p>
+      </div>
+      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1.5rem; margin-top: 1rem;">
+        <div>
+          <label style="display: block; font-size: 0.8rem; color: var(--text-muted); margin-bottom: 0.5rem; text-transform: uppercase;">User UUID</label>
+          <input type="text" id="gen-uuid-input" placeholder="e.g. 550e8400-e29b-41d4-a716-446655440000" style="width: 100%; padding: 0.75rem; background: rgba(255,255,255,0.03); border: 1px solid var(--border-color); border-radius: 8px; color: var(--text-main); font-family: inherit;">
+        </div>
+        <div>
+          <label style="display: block; font-size: 0.8rem; color: var(--text-muted); margin-bottom: 0.5rem; text-transform: uppercase;">User Name</label>
+          <input type="text" id="gen-name-input" placeholder="e.g. Ali" style="width: 100%; padding: 0.75rem; background: rgba(255,255,255,0.03); border: 1px solid var(--border-color); border-radius: 8px; color: var(--text-main); font-family: inherit;">
+        </div>
+        <div style="grid-column: 1 / -1; display: flex; align-items: center; gap: 1.5rem; border-top: 1px solid rgba(255,255,255,0.06); padding-top: 1.5rem;">
+          <button id="btn-generate-link" class="secondary-btn" style="padding: 0.75rem 2rem;">Generate VLESS Link</button>
+        </div>
+        <div style="grid-column: 1 / -1; margin-top: 1rem;">
+          <textarea id="generated-link-output" readonly style="width: 100%; height: 80px; padding: 0.75rem; background: rgba(0,0,0,0.3); border: 1px dashed var(--border-color); border-radius: 8px; color: #10b981; font-family: monospace; resize: none;" placeholder="Generated link will appear here..."></textarea>
+        </div>
+      </div>
+    </div>
   </div>
 
   <script>
@@ -315,6 +339,30 @@
           saveStatusMsg.innerText = "✗ Error: " + err.message;
           saveStatusMsg.style.color = "#ef4444";
         }
+      });
+
+      // Link Generator Logic
+      document.getElementById('btn-generate-link').addEventListener('click', () => {
+        const uuid = document.getElementById('gen-uuid-input').value.trim();
+        const name = document.getElementById('gen-name-input').value.trim() || 'User';
+        const domain = document.getElementById('vps-ip-input').value.trim() || window.location.hostname;
+        const port = document.getElementById('vps-port-input').value.trim() || '443';
+        const protocol = document.getElementById('vps-protocol-input').value;
+        const path = document.getElementById('vps-path-input').value.trim() || '/metrics';
+        
+        if (!uuid) {
+          alert('Please enter a UUID first!');
+          return;
+        }
+
+        let link = "";
+        if (protocol === 'wss') {
+          link = \`vless://\${uuid}@\${domain}:\${port}?type=ws&security=tls&path=\${encodeURIComponent(path)}&host=\${domain}#IranTUN_\${name}\`;
+        } else {
+          link = \`vless://\${uuid}@\${domain}:\${port}?type=ws&security=none&path=\${encodeURIComponent(path)}&host=\${domain}#IranTUN_\${name}_Unsecured\`;
+        }
+        
+        document.getElementById('generated-link-output').value = link;
       });
     }
   </script>

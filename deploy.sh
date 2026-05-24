@@ -49,13 +49,22 @@ main() {
         exit 1
     fi
 
-    # Generate secure UUID dynamically
+    # Generate secure UUID dynamically for Web Panel (Admin Secret)
     if command -v uuidgen >/dev/null 2>&1; then
-        SECURE_UUID=$(uuidgen | tr '[:upper:]' '[:lower:]')
+        ADMIN_SECRET=$(uuidgen | tr '[:upper:]' '[:lower:]')
     elif [ -f /proc/sys/kernel/random/uuid ]; then
-        SECURE_UUID=$(cat /proc/sys/kernel/random/uuid)
+        ADMIN_SECRET=$(cat /proc/sys/kernel/random/uuid)
     else
-        SECURE_UUID="cc654e3d-71b5-4a6c-b3a2-a3962b8a07c1"
+        ADMIN_SECRET="admin-secret-cc654e3d-71b5"
+    fi
+
+    # Generate distinct UUID for the first VLESS user
+    if command -v uuidgen >/dev/null 2>&1; then
+        USER_UUID=$(uuidgen | tr '[:upper:]' '[:lower:]')
+    elif [ -f /proc/sys/kernel/random/uuid ]; then
+        USER_UUID=$(cat /proc/sys/kernel/random/uuid)
+    else
+        USER_UUID="user-uuid-a3962b8a07c1"
     fi
 
     echo -e "\n${YELLOW}--- Part 1: Foreign VPS Setup ---${NC}"
@@ -126,6 +135,13 @@ main() {
 
     # 1. Connect to VPS and install Xray locally
     echo -e "\n${BLUE}--- Part 3: Deploying Exit Node locally on this VPS ---${NC}"
+    echo "Installing required packages (jq, curl)..."
+    if [ -f /etc/debian_version ]; then
+        apt-get update -y && apt-get install -y jq curl
+    elif [ -f /etc/redhat-release ]; then
+        yum install -y jq curl
+    fi
+
     echo "Installing Xray-core..."
     bash -c "$(curl -L https://github.com/XTLS/Xray-install/raw/main/install-release.sh)" @ install
     
@@ -148,9 +164,9 @@ main() {
       "settings": {
         "clients": [
           {
-            "id": "$SECURE_UUID",
+            "id": "$USER_UUID",
             "level": 0,
-            "email": "love@$BRIDGE_DOMAIN"
+            "email": "Admin_User@$BRIDGE_DOMAIN"
           }
         ],
         "decryption": "none"
@@ -234,7 +250,7 @@ XRAY_CONF
   "vpsProtocol": "$VPS_PROTOCOL",
   "vpsPath": "/metrics",
   "tunnelPath": "/api/v1/analytics",
-  "secretUuid": "$SECURE_UUID",
+  "secretUuid": "$ADMIN_SECRET",
   "port": 3000
 }
 EOF
@@ -282,13 +298,13 @@ EOF
     echo -e "\nReady-to-use Client Configurations:"
     echo -e "${BLUE}------------------------------------------------------------${NC}"
     echo -e "${GREEN}⚡ SECURED VLESS LINK (Port 443 with SSL):${NC}"
-    echo -e "vless://$SECURE_UUID@$BRIDGE_DOMAIN:443?type=ws&security=tls&path=%2Fapi%2Fv1%2Fanalytics&host=$BRIDGE_DOMAIN#IranTUN_HighSpeed_VLESS"
+    echo -e "vless://$USER_UUID@$BRIDGE_DOMAIN:443?type=ws&security=tls&path=%2Fapi%2Fv1%2Fanalytics&host=$BRIDGE_DOMAIN#IranTUN_HighSpeed_VLESS"
     echo -e "${BLUE}------------------------------------------------------------${NC}"
     echo -e "${GREEN}⚡ UNSECURED VLESS LINK (Port 80 HTTP):${NC}"
-    echo -e "vless://$SECURE_UUID@$BRIDGE_DOMAIN:80?type=ws&security=none&path=%2Fapi%2Fv1%2Fanalytics&host=$BRIDGE_DOMAIN#IranTUN_Unsecured_VLESS"
+    echo -e "vless://$USER_UUID@$BRIDGE_DOMAIN:80?type=ws&security=none&path=%2Fapi%2Fv1%2Fanalytics&host=$BRIDGE_DOMAIN#IranTUN_Unsecured_VLESS"
     echo -e "${BLUE}------------------------------------------------------------${NC}"
-    echo -e "${GREEN}⚡ SECRET DIAGNOSTICS & LIVE MONITORING CONSOLE:${NC}"
-    echo -e "https://$BRIDGE_DOMAIN?secret=$SECURE_UUID"
+    echo -e "${GREEN}🔒 SECRET DIAGNOSTICS & LIVE MONITORING CONSOLE:${NC}"
+    echo -e "https://$BRIDGE_DOMAIN?secret=$ADMIN_SECRET"
     echo -e "${BLUE}------------------------------------------------------------${NC}"
 
     echo -e "\n${BLUE}*** IMPORTANT: Web Panel Configuration ***${NC}"

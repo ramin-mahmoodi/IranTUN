@@ -1,12 +1,13 @@
 #!/bin/bash
 
-# IranTUN CLI Management Menu
+# IranTUN CLI Management Menu - Multi-User Edition
 # Designed for VPS Exit Nodes
 
 RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
+CYAN='\033[0;36m'
 NC='\033[0m' # No Color
 
 XRAY_CONF="/usr/local/etc/xray/config.json"
@@ -21,70 +22,169 @@ if [ ! -f "$XRAY_CONF" ]; then
   exit 1
 fi
 
-get_config_value() {
-    # Extract values safely using awk
-    UUID=$(grep '"id"' $XRAY_CONF | awk -F'"' '{print $4}' | head -1)
-    PORT=$(grep '"port"' $XRAY_CONF | awk -F':' '{print $2}' | tr -d ' ,' | head -1)
-    DOMAIN=$(grep '"email"' $XRAY_CONF | awk -F'@' '{print $2}' | awk -F'"' '{print $1}' | head -1)
-    TLS=$(grep '"security"' $XRAY_CONF | awk -F'"' '{print $4}' | grep -v 'none' | head -1)
-    if [ -z "$TLS" ]; then
-        TLS="none"
+if ! command -v jq >/dev/null 2>&1; then
+  echo -e "${RED}Error: 'jq' is not installed. Please install jq to use the multi-user manager.${NC}"
+  echo "Debian/Ubuntu: apt-get install jq"
+  echo "CentOS/RHEL: yum install jq"
+  exit 1
+fi
+
+# Extract common bridge settings
+DOMAIN=$(jq -r '.inbounds[0].settings.clients[0].email' $XRAY_CONF | cut -d'@' -f2)
+PORT=$(jq -r '.inbounds[0].port' $XRAY_CONF)
+TLS_SETTING=$(jq -r '.inbounds[0].streamSettings.security' $XRAY_CONF)
+
+generate_vless_link() {
+    local uuid=$1
+    local email=$2
+    local domain=$3
+    local tls=$4
+    local name=$(echo "$email" | cut -d'@' -f1)
+    
+    if [ "$tls" == "tls" ]; then
+        echo "vless://$uuid@$domain:443?type=ws&security=tls&path=%2Fapi%2Fv1%2Fanalytics&host=$domain#IranTUN_$name"
     else
-        TLS="tls"
+        echo "vless://$uuid@$domain:80?type=ws&security=none&path=%2Fapi%2Fv1%2Fanalytics&host=$domain#IranTUN_${name}_Unsecured"
     fi
 }
 
-show_config() {
-    get_config_value
+list_users() {
     echo -e "\n${BLUE}============================================================${NC}"
-    echo -e "${GREEN}  IranTUN Active Configurations ${NC}"
+    echo -e "${GREEN}  IranTUN Active Users & Links ${NC}"
     echo -e "${BLUE}============================================================${NC}"
-    echo -e "Target Domain : ${YELLOW}$DOMAIN${NC}"
-    echo -e "VPS Listen Port: ${YELLOW}$PORT${NC}"
-    echo -e "Security      : ${YELLOW}$TLS${NC}"
-    echo -e "Secret UUID   : ${YELLOW}$UUID${NC}"
-    echo -e "\n${GREEN}⚡ VLESS CONNECTION LINK:${NC}"
-    echo -e "vless://$UUID@$DOMAIN:443?type=ws&security=tls&path=%2Fapi%2Fv1%2Fanalytics&host=$DOMAIN#IranTUN_VLESS"
-    echo -e "\n${GREEN}🔒 SECRET ADMIN PANEL:${NC}"
-    echo -e "https://$DOMAIN?secret=$UUID"
+    
+    local num_clients=$(jq '.inbounds[0].settings.clients | length' $XRAY_CONF)
+    
+    if [ "$num_clients" -eq 0 ]; then
+        echo -e "${RED}No users found.${NC}"
+    else
+        for ((i=0; i<$num_clients; i++)); do
+            local client_uuid=$(jq -r ".inbounds[0].settings.clients[$i].id" $XRAY_CONF)
+            local client_email=$(jq -r ".inbounds[0].settings.clients[$i].email" $XRAY_CONF)
+            local client_name=$(echo "$client_email" | cut -d'@' -f1)
+            
+            echo -e "${YELLOW}[User $((i+1))] Name:${NC} $client_name"
+            echo -e "${CYAN}UUID:${NC} $client_uuid"
+            generate_vless_link "$client_uuid" "$client_email" "$DOMAIN" "$TLS_SETTING"
+            echo -e "------------------------------------------------------------"
+        done
+    fi
     echo -e "${BLUE}============================================================${NC}"
     read -p "Press Enter to return to menu..."
 }
 
-change_uuid() {
-    get_config_value
-    echo -e "\n${YELLOW}--- Change Secret UUID ---${NC}"
-    read -p "Enter new UUID (press Enter to auto-generate): " NEW_UUID
-    if [ -z "$NEW_UUID" ]; then
-        if command -v uuidgen >/dev/null; then
-            NEW_UUID=$(uuidgen | tr '[:upper:]' '[:lower:]')
-        else
-            NEW_UUID=$(cat /proc/sys/kernel/random/uuid)
-        fi
+add_user() {
+    echo -e "\n${YELLOW}--- Add New User ---${NC}"
+    read -p "Enter username (no spaces, e.g. 'Ali' or 'User2'): " NEW_USER
+    if [ -z "$NEW_USER" ]; then
+        echo -e "${RED}Username cannot be empty.${NC}"
+        read -p "Press Enter to return..."
+        return
     fi
     
-    # Replace UUID in config
-    sed -i "s/\"id\": \"$UUID\"/\"id\": \"$NEW_UUID\"/g" $XRAY_CONF
+    # Remove spaces and special chars
+    NEW_USER=$(echo "$NEW_USER" | tr -dc '[:alnum:]_')
     
-    echo -e "Restarting Xray service..."
-    systemctl restart xray
+    # Check if user already exists
+    local exists=$(jq -r ".inbounds[0].settings.clients[].email" $XRAY_CONF | grep -c "^${NEW_USER}@")
+    if [ "$exists" -gt 0 ]; then
+        echo -e "${RED}Error: User '$NEW_USER' already exists!${NC}"
+        read -p "Press Enter to return..."
+        return
+    fi
     
-    echo -e "${GREEN}✓ UUID changed successfully to: $NEW_UUID${NC}"
-    echo -e "${RED}⚠️ IMPORTANT: You must now log into your cPanel Web Admin Panel and update the UUID there as well, otherwise the bridge will break!${NC}"
+    # Generate UUID
+    if command -v uuidgen >/dev/null; then
+        NEW_UUID=$(uuidgen | tr '[:upper:]' '[:lower:]')
+    else
+        NEW_UUID=$(cat /proc/sys/kernel/random/uuid)
+    fi
+    
+    local NEW_EMAIL="${NEW_USER}@${DOMAIN}"
+    
+    # Use jq to append a new client
+    # Create a temp file
+    local TMP_CONF=$(mktemp)
+    jq ".inbounds[0].settings.clients += [{\"id\": \"$NEW_UUID\", \"level\": 0, \"email\": \"$NEW_EMAIL\"}]" $XRAY_CONF > $TMP_CONF
+    
+    if [ $? -eq 0 ]; then
+        mv $TMP_CONF $XRAY_CONF
+        systemctl restart xray
+        echo -e "${GREEN}✓ User '$NEW_USER' added successfully!${NC}"
+        echo -e "\n${GREEN}⚡ Connection Link:${NC}"
+        generate_vless_link "$NEW_UUID" "$NEW_EMAIL" "$DOMAIN" "$TLS_SETTING"
+    else
+        echo -e "${RED}Error adding user.${NC}"
+        rm -f $TMP_CONF
+    fi
+    
+    echo -e "\n"
     read -p "Press Enter to return to menu..."
+}
+
+remove_user() {
+    echo -e "\n${YELLOW}--- Remove User ---${NC}"
+    local num_clients=$(jq '.inbounds[0].settings.clients | length' $XRAY_CONF)
+    
+    if [ "$num_clients" -eq 0 ]; then
+        echo -e "${RED}No users found.${NC}"
+        read -p "Press Enter to return..."
+        return
+    fi
+    
+    echo "Available users:"
+    for ((i=0; i<$num_clients; i++)); do
+        local client_email=$(jq -r ".inbounds[0].settings.clients[$i].email" $XRAY_CONF)
+        local client_name=$(echo "$client_email" | cut -d'@' -f1)
+        echo -e "  [$i] $client_name"
+    done
+    
+    read -p "Enter the number of the user to remove (or 'q' to cancel): " DEL_IDX
+    
+    if [ "$DEL_IDX" == "q" ] || [ -z "$DEL_IDX" ]; then
+        return
+    fi
+    
+    if [[ "$DEL_IDX" =~ ^[0-9]+$ ]] && [ "$DEL_IDX" -lt "$num_clients" ]; then
+        local target_name=$(jq -r ".inbounds[0].settings.clients[$DEL_IDX].email" $XRAY_CONF | cut -d'@' -f1)
+        read -p "Are you sure you want to delete '$target_name'? (y/n) " CONFIRM
+        if [[ "$CONFIRM" =~ ^[Yy]$ ]]; then
+            local TMP_CONF=$(mktemp)
+            jq "del(.inbounds[0].settings.clients[$DEL_IDX])" $XRAY_CONF > $TMP_CONF
+            if [ $? -eq 0 ]; then
+                mv $TMP_CONF $XRAY_CONF
+                systemctl restart xray
+                echo -e "${GREEN}✓ User '$target_name' deleted successfully.${NC}"
+            else
+                echo -e "${RED}Error deleting user.${NC}"
+                rm -f $TMP_CONF
+            fi
+        else
+            echo "Cancelled."
+        fi
+    else
+        echo -e "${RED}Invalid user number.${NC}"
+    fi
+    
+    read -p "Press Enter to return..."
 }
 
 change_port() {
-    get_config_value
     echo -e "\n${YELLOW}--- Change VPS Listen Port ---${NC}"
     echo -e "Current Port: $PORT"
     read -p "Enter new Port: " NEW_PORT
     if [[ "$NEW_PORT" =~ ^[0-9]+$ ]] && [ "$NEW_PORT" -ge 1 ] && [ "$NEW_PORT" -le 65535 ]; then
-        sed -i "s/\"port\": $PORT/\"port\": $NEW_PORT/g" $XRAY_CONF
-        echo -e "Restarting Xray service..."
-        systemctl restart xray
-        echo -e "${GREEN}✓ Port changed successfully to: $NEW_PORT${NC}"
-        echo -e "${RED}⚠️ IMPORTANT: Remember to update the 'VPS Port' setting in your cPanel Web Admin Panel!${NC}"
+        local TMP_CONF=$(mktemp)
+        jq ".inbounds[0].port = $NEW_PORT" $XRAY_CONF > $TMP_CONF
+        if [ $? -eq 0 ]; then
+            mv $TMP_CONF $XRAY_CONF
+            systemctl restart xray
+            echo -e "${GREEN}✓ Port changed successfully to: $NEW_PORT${NC}"
+            echo -e "${RED}⚠️ IMPORTANT: Remember to update the 'VPS Port' setting in your cPanel Web Admin Panel!${NC}"
+        else
+            echo -e "${RED}Error changing port.${NC}"
+            rm -f $TMP_CONF
+        fi
     else
         echo -e "${RED}Invalid port number.${NC}"
     fi
@@ -164,26 +264,33 @@ uninstall_irantun() {
 # Main Menu Loop
 while true; do
     clear
+    # Re-fetch variables to ensure they are up to date
+    DOMAIN=$(jq -r '.inbounds[0].settings.clients[0].email' $XRAY_CONF | cut -d'@' -f2)
+    PORT=$(jq -r '.inbounds[0].port' $XRAY_CONF)
+    TLS_SETTING=$(jq -r '.inbounds[0].streamSettings.security' $XRAY_CONF)
+
     echo -e "${BLUE}============================================================${NC}"
-    echo -e "${GREEN}      IranTUN VPS Management Console (v1.0)                 ${NC}"
+    echo -e "${GREEN}      IranTUN VPS User Management Console (Multi-User)      ${NC}"
     echo -e "${BLUE}============================================================${NC}"
-    echo -e " [1] View Configuration & Links"
-    echo -e " [2] Change Secret UUID"
-    echo -e " [3] Change VPS Listen Port"
-    echo -e " [4] System Status"
-    echo -e " [5] Restart Services"
-    echo -e " [6] Uninstall IranTUN"
+    echo -e " [1] View All Users & VLESS Links"
+    echo -e " [2] Add New User"
+    echo -e " [3] Remove User"
+    echo -e " [4] Change VPS Listen Port"
+    echo -e " [5] System Status"
+    echo -e " [6] Restart Services"
+    echo -e " [7] Uninstall IranTUN"
     echo -e " [0] Exit"
     echo -e "${BLUE}============================================================${NC}"
-    read -p "Select an option [0-6]: " OPTION
+    read -p "Select an option [0-7]: " OPTION
 
     case $OPTION in
-        1) show_config ;;
-        2) change_uuid ;;
-        3) change_port ;;
-        4) system_status ;;
-        5) restart_services ;;
-        6) uninstall_irantun ;;
+        1) list_users ;;
+        2) add_user ;;
+        3) remove_user ;;
+        4) change_port ;;
+        5) system_status ;;
+        6) restart_services ;;
+        7) uninstall_irantun ;;
         0) exit 0 ;;
         *) echo -e "${RED}Invalid option.${NC}"; sleep 1 ;;
     esac
