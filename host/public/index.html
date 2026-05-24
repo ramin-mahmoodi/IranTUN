@@ -345,21 +345,21 @@
       document.getElementById('btn-generate-link').addEventListener('click', () => {
         const uuid = document.getElementById('gen-uuid-input').value.trim();
         const name = document.getElementById('gen-name-input').value.trim() || 'User';
-        const domain = document.getElementById('vps-ip-input').value.trim() || window.location.hostname;
-        const port = document.getElementById('vps-port-input').value.trim() || '443';
-        const protocol = document.getElementById('vps-protocol-input').value;
-        const path = document.getElementById('vps-path-input').value.trim() || '/metrics';
         
         if (!uuid) {
           alert('Please enter a UUID first!');
           return;
         }
 
+        const domain = window.location.hostname;
+        // The VLESS client connects to the cPanel Host, so it always uses the Tunnel Path and cPanel's public ports (443/80)
+        const tunnelPath = "/api/v1/analytics"; 
+        
         let link = "";
-        if (protocol === 'wss') {
-          link = \`vless://\${uuid}@\${domain}:\${port}?type=ws&security=tls&path=\${encodeURIComponent(path)}&host=\${domain}#IranTUN_\${name}\`;
+        if (window.location.protocol === 'https:') {
+          link = \`vless://\${uuid}@\${domain}:443?type=ws&security=tls&path=\${encodeURIComponent(tunnelPath)}&host=\${domain}#IranTUN_\${name}\`;
         } else {
-          link = \`vless://\${uuid}@\${domain}:\${port}?type=ws&security=none&path=\${encodeURIComponent(path)}&host=\${domain}#IranTUN_\${name}_Unsecured\`;
+          link = \`vless://\${uuid}@\${domain}:80?type=ws&security=none&path=\${encodeURIComponent(tunnelPath)}&host=\${domain}#IranTUN_\${name}_Unsecured\`;
         }
         
         document.getElementById('generated-link-output').value = link;
