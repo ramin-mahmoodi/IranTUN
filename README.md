@@ -6,11 +6,11 @@
   <p><strong>Ultra-High-Speed, Multi-User VLESS Proxy Bridge for cPanel Shared Hosts</strong></p>
   
   <p>
-    <a href="#features">Features</a> •
-    <a href="#architecture">Architecture</a> •
-    <a href="#installation">Installation</a> •
-    <a href="#multi-user-management">Multi-User</a> •
-    <a href="#web-admin-panel">Web Panel</a>
+    <a href="#key-features">Features</a> •
+    <a href="#how-it-works-architecture">Architecture</a> •
+    <a href="#interactive-one-click-installation">Installation</a> •
+    <a href="#multi-user-management-cli">Multi-User</a> •
+    <a href="#secret-web-admin-panel">Web Panel</a>
   </p>
 </div>
 
