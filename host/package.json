@@ -7,7 +7,7 @@
     "start": "node app.js"
   },
   "dependencies": {
-    "ws": "^8.16.0"
+    "ws": "^8.21.0"
   },
   "author": "IranTUN",
   "license": "MIT"

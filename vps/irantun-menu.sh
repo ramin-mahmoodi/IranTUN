@@ -300,6 +300,78 @@ manage_domains() {
                     else
                         echo "$NEW_DOM" >> "$DOMAINS_FILE"
                         echo -e "${GREEN}Domain added.${NC}"
+
+                        echo -e "\n${YELLOW}Do you want to automatically upload the bridge files to this new cPanel host via FTP? (y/n)${NC}"
+                        read -p "Upload files? [y]: " UPLOAD_OPT
+                        UPLOAD_OPT=${UPLOAD_OPT:-y}
+                        if [[ "$UPLOAD_OPT" =~ ^[Yy]$ ]]; then
+                            FTP_HOST="ftp.$NEW_DOM"
+                            read -p "Enter cPanel FTP Username for $NEW_DOM: " FTP_USER
+                            read -sp "Enter FTP Password: " FTP_PASS
+                            echo ""
+                            read -p "Enter Application Root Directory on cPanel [irantun-bridge]: " APP_ROOT
+                            APP_ROOT=${APP_ROOT:-irantun-bridge}
+                            
+                            VPS_IP=$(curl -s https://api.ipify.org)
+                            if [ -z "$VPS_IP" ]; then VPS_IP=$(curl -s http://ifconfig.me); fi
+                            
+                            VPS_PORT=$(jq -r '.inbounds[0].port' "$XRAY_CONF")
+                            VPS_PROTOCOL="ws"
+                            if [ "$(jq -r '.inbounds[0].streamSettings.security' "$XRAY_CONF")" == "tls" ]; then
+                                VPS_PROTOCOL="wss"
+                            fi
+                            
+                            if command -v uuidgen >/dev/null 2>&1; then
+                                ADMIN_SECRET=$(uuidgen | tr '[:upper:]' '[:lower:]')
+                            elif [ -f /proc/sys/kernel/random/uuid ]; then
+                                ADMIN_SECRET=$(cat /proc/sys/kernel/random/uuid)
+                            else
+                                ADMIN_SECRET="admin-secret-$(date +%s)"
+                            fi
+                            
+                            echo -e "${BLUE}Preparing temporary workspace...${NC}"
+                            TEMP_DIR=$(mktemp -d -t irantun-XXXXXXXXXX)
+                            mkdir -p "$TEMP_DIR/host/public"
+                            
+                            GITHUB_RAW="https://raw.githubusercontent.com/ramin-mahmoodi/IranTUN/main"
+                            echo "Downloading latest bridge files from GitHub..."
+                            curl -s -L "$GITHUB_RAW/host/app.js" -o "$TEMP_DIR/host/app.js"
+                            curl -s -L "$GITHUB_RAW/host/package.json" -o "$TEMP_DIR/host/package.json"
+                            curl -s -L "$GITHUB_RAW/host/public/index.html" -o "$TEMP_DIR/host/public/index.html"
+                            curl -s -L "$GITHUB_RAW/host/public/style.css" -o "$TEMP_DIR/host/public/style.css"
+
+                            echo -e "${BLUE}Generating bridge config file...${NC}"
+                            cat <<EOF > "$TEMP_DIR/host/config.json"
+{
+  "vpsIp": "$VPS_IP",
+  "vpsPort": $VPS_PORT,
+  "vpsProtocol": "$VPS_PROTOCOL",
+  "vpsPath": "/metrics",
+  "tunnelPath": "/api/v1/analytics",
+  "secretUuid": "$ADMIN_SECRET",
+  "port": 3000,
+  "adaptiveUpload": false,
+  "adaptiveDelayMs": 15
+}
+EOF
+                            echo -e "${YELLOW}Uploading files to ftp://$FTP_HOST/$APP_ROOT...${NC}"
+                            curl -u "$FTP_USER:$FTP_PASS" --ftp-create-dirs \
+                                -T "$TEMP_DIR/host/app.js" "ftp://$FTP_HOST/$APP_ROOT/app.js" \
+                                -T "$TEMP_DIR/host/package.json" "ftp://$FTP_HOST/$APP_ROOT/package.json" \
+                                -T "$TEMP_DIR/host/config.json" "ftp://$FTP_HOST/$APP_ROOT/config.json" \
+                                -T "$TEMP_DIR/host/public/index.html" "ftp://$FTP_HOST/$APP_ROOT/public/index.html" \
+                                -T "$TEMP_DIR/host/public/style.css" "ftp://$FTP_HOST/$APP_ROOT/public/style.css"
+
+                            if [ $? -eq 0 ]; then
+                                echo -e "${GREEN}✓ All files uploaded successfully via FTP!${NC}"
+                                echo -e "${CYAN}🔒 Diagnostic Console for this host: https://$NEW_DOM?secret=$ADMIN_SECRET${NC}"
+                                echo -e "${YELLOW}Please complete Setup Node.js App in cPanel for $NEW_DOM!${NC}"
+                            else
+                                echo -e "${RED}✗ FTP upload failed! Make sure your FTP credentials are correct.${NC}"
+                            fi
+                            rm -rf "$TEMP_DIR"
+                            read -p "Press Enter to continue..."
+                        fi
                     fi
                 fi
                 sleep 1
