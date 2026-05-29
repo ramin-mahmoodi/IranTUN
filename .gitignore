@@ -8,3 +8,9 @@ yarn-error.log*
 # System Files
 .DS_Store
 Thumbs.db
+
+# Test and dev files
+test_user_app.js
+package.json
+package-lock.json
+host/package-lock.json
